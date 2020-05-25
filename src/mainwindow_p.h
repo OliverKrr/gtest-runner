@@ -31,6 +31,7 @@
 //--------------------------------------------------------------------------------------------------
 // 
 // Copyright (c) 2016 Nic Holthaus
+// Copyright (c) 2020 Oliver Karrenbauer
 // 
 //--------------------------------------------------------------------------------------------------
 
@@ -112,7 +113,7 @@ public:
 	QFrame*									executableDockFrame;					///< Frame for containing the dock's sub-widgets
 	QExecutableTreeView*					executableTreeView;						///< Widget to display and select gtest executables	
 	QExecutableModel*						executableModel;						///< Item model for test executables.
-	QPushButton*							addTestButton;							///< Button which adds a test to the monitored tests.
+        QPushButton*							updateTestsButton;							///< Button to update tests and select a _RunEnv if not selected before
 	QFileSystemWatcher*						fileWatcher;							///< Hash table to store the file system watchers.
 	QStringList								executablePaths;						///< String list of all the paths, which can be used to re-constitute the filewatcher after an executable rebuild.
 
@@ -151,7 +152,7 @@ public:
 	QMenu*									windowMenu;								///< Menu to display/change dock visibility.
 
 	QMenu*									testMenu;								///< Menu for test-related actions
-	QAction*								addTestAction;							///< Opens a dialog to add a test executable.
+        QAction*								selectRunEnvAction;							///< Opens a dialog to select _RunEnv
 	QAction*								selectAndKillTest;						///< Selects and kills a running test.
 	QAction*								selectAndRemoveTestAction;				///< Remove a test after choosing it from a list.
 	QAction*								selectAndRunTest;						///< Run a test after selecting it from a list.																	///< program options.
@@ -199,7 +200,7 @@ public:
 	explicit MainWindowPrivate(QStringList tests, bool reset, MainWindow* q);
 
 	QString xmlPath(const QString& testPath) const;
-	void addTestExecutable(const QString& path, bool autorun, QDateTime lastModified, QString filter = "", int repeat = 0, Qt::CheckState runDisabled = Qt::Unchecked, Qt::CheckState shuffle = Qt::Unchecked, int randomSeed = 0, QString otherArgs = "");
+        void addTestExecutable(const QString& path, const QString& testDriver, bool autorun, QDateTime lastModified, QString filter = "", int repeat = 0, Qt::CheckState runDisabled = Qt::Unchecked, Qt::CheckState shuffle = Qt::Unchecked, int randomSeed = 0, QString otherArgs = "");
 	void runTestInThread(const QString& pathToTest, bool notify);
 	bool loadTestResults(const QString& testPath, bool notify);
 	void selectTest(const QString& testPath);
@@ -208,6 +209,7 @@ public:
 	void removeTest(const QModelIndex &index);
 	void clearData();
 	void clearSettings();
+        void updateTestExecutables();
 
 protected:
 
@@ -227,7 +229,7 @@ protected:
 	
 private:
 
-	QString m_testDirectory;
+	QString runEnvPath_;
 
 };	// CLASS: MainWindowPrivate
 

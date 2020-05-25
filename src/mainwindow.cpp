@@ -39,11 +39,12 @@ MainWindow::MainWindow(QStringList tests, bool reset) : QMainWindow(), d_ptr(new
 	d->loadSettings();
 
 	// add tests from the command line
-	for (auto itr = tests.begin(); itr != tests.end(); ++itr)
-	{
-		QFileInfo info(*itr);
-		d->addTestExecutable(info.absoluteFilePath(), true, info.lastModified());
-	}
+        // TODO: disable for now
+	//for (auto itr = tests.begin(); itr != tests.end(); ++itr)
+	//{
+	//	QFileInfo info(*itr);
+	//	d->addTestExecutable(info.absoluteFilePath(), true, info.lastModified());
+	//}
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -86,13 +87,13 @@ QSize MainWindow::sizeHint() const
 //--------------------------------------------------------------------------------------------------
 void MainWindow::dragEnterEvent(QDragEnterEvent *e)
 {
-	
-	if (e->mimeData()->hasUrls()) 
-	{
-		QFileInfo info(e->mimeData()->urls().first().toLocalFile());
-		if (info.isExecutable())
-			e->acceptProposedAction();
-	}
+    // TODO: disable for now
+	// if (e->mimeData()->hasUrls()) 
+	// {
+	// 	QFileInfo info(e->mimeData()->urls().first().toLocalFile());
+	// 	if (info.isExecutable())
+	// 		e->acceptProposedAction();
+	// }
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -100,12 +101,13 @@ void MainWindow::dragEnterEvent(QDragEnterEvent *e)
 //--------------------------------------------------------------------------------------------------
 void MainWindow::dropEvent(QDropEvent *e)
 {
- 	if (e->mimeData()->hasUrls()) 
- 	{
-     	foreach (QUrl url, e->mimeData()->urls())
-     	{
- 			QFileInfo info(url.toLocalFile());
-			d_ptr->addTestExecutable(info.absoluteFilePath(), true, info.lastModified());
-     	}
- 	}
+    // TODO: disable for now
+ 	// if (e->mimeData()->hasUrls()) 
+ 	// {
+     	// foreach (QUrl url, e->mimeData()->urls())
+     	// {
+ 	// 		QFileInfo info(url.toLocalFile());
+	// 		d_ptr->addTestExecutable(info.absoluteFilePath(), true, info.lastModified());
+     	// }
+ 	// }
 }

@@ -121,6 +121,8 @@ Q_INVOKABLE QVariant QExecutableModel::data(const QModelIndex &index, int role /
 		return itr->autorun;
 	case PathRole:
 		return itr->path;
+        case TestDriverRole:
+            return itr->testDriver;
 	case StateRole:
 		return itr->state;
 	case LastModifiedRole:
@@ -165,6 +167,9 @@ Q_INVOKABLE bool QExecutableModel::setData(const QModelIndex &index, const QVari
 	case Qt::EditRole || Qt::DisplayRole || QExecutableModel::PathRole:
 		itr->path = value.toString();
 		break;
+        case TestDriverRole:
+            itr->testDriver = value.toString();
+            break;
 	case Qt::CheckStateRole:
 		itr->autorun = value.toBool();
 	case AutorunRole:
@@ -268,6 +273,7 @@ QMimeData * QExecutableModel::mimeData(const QModelIndexList &indexes) const
 		if (index.isValid() && index.column() == 0) 
 		{
 			QVariant PathRoleText = data(index, PathRole);
+                        QVariant TestDriverText = data(index, TestDriverRole);
 			QVariant StateRoleText = data(index, StateRole);
 			QVariant LastModifiedRoleText = data(index, LastModifiedRole);
 			QVariant ProgressRoleText = data(index, ProgressRole);
@@ -279,7 +285,7 @@ QMimeData * QExecutableModel::mimeData(const QModelIndexList &indexes) const
 			QVariant ArgsRoleText = data(index, ArgsRole);
 			QVariant NameRoleText = data(index, NameRole);
 			QVariant AutorunRoleText = data(index, AutorunRole);
-			stream << PathRoleText << StateRoleText << LastModifiedRoleText << ProgressRoleText << FilterRoleText << RepeatTestsRoleText <<
+                        stream << PathRoleText << TestDriverText << StateRoleText << LastModifiedRoleText << ProgressRoleText << FilterRoleText << RepeatTestsRoleText <<
 				RunDisabledTestsRoleText << ShuffleRoleText << RandomSeedRoleText << ArgsRoleText << NameRoleText << AutorunRoleText;
 		}
 	}
@@ -310,6 +316,7 @@ bool QExecutableModel::dropMimeData(const QMimeData *data, Qt::DropAction action
 		while (!stream.atEnd()) {
 			QMap<int, QVariant> itemData;
 			stream >> itemData[PathRole];
+                        stream >> itemData[TestDriverRole];
 			stream >> itemData[StateRole];
 			stream >> itemData[LastModifiedRole];
 			stream >> itemData[ProgressRole];	// doesn't seem to be there
@@ -349,6 +356,7 @@ QMap<int, QVariant> QExecutableModel::itemData(const QModelIndex &index) const
 	auto itr = indexToIterator(index);
 	QMap<int, QVariant> ret;
 	ret[PathRole] = itr->path;
+        ret[TestDriverRole] = itr->testDriver;
 	ret[StateRole] = itr->state;
 	ret[LastModifiedRole] = itr->lastModified;
 	ret[ProgressRole] = itr->progress;
@@ -373,6 +381,7 @@ bool QExecutableModel::setItemData(const QModelIndex &index, const QMap<int, QVa
 
 	auto itr = indexToIterator(index);
 	itr->path = roles[PathRole].toString();
+        itr->testDriver = roles[TestDriverRole].toString();
 	itr->state = (ExecutableData::States)roles[StateRole].toInt();
 	itr->lastModified = roles[LastModifiedRole].toDateTime();
 	itr->progress = roles[ProgressRole].toInt();

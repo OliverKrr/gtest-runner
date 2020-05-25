@@ -31,6 +31,7 @@
 //--------------------------------------------------------------------------------------------------
 // 
 // Copyright (c) 2016 Nic Holthaus
+// Copyright (c) 2020 Oliver Karrenbauer
 // 
 //--------------------------------------------------------------------------------------------------
 
@@ -71,6 +72,7 @@ struct ExecutableData
 	ExecutableData(QString path = "") : path(path) {};
 
 	QString			path;				///< Full, absolute path to test executable
+        QString			testDriver;			///< Full, absolute path to test driver
 	bool			autorun;			///< Whether to autorun the tests when they change.
 	States			state;				///< Current state of test execution
 	QDateTime		lastModified;		///< Last time the executable was modified
@@ -126,6 +128,7 @@ public:
 		ArgsRole = Qt::UserRole + 8,
 		NameRole = Qt::UserRole + 9,
 		AutorunRole = Qt::UserRole + 10,
+                TestDriverRole = Qt::UserRole + 11,
 	};
 
  	explicit QExecutableModel(QObject* parent = nullptr);

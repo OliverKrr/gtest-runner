@@ -15,6 +15,7 @@
 #include <QScrollBar>
 #include <QStack>
 #include <QStyle>
+#include <QDirIterator>
 
 //--------------------------------------------------------------------------------------------------
 //	FUNCTION: MainWindowPrivate
@@ -26,7 +27,7 @@ MainWindowPrivate::MainWindowPrivate(QStringList tests, bool reset, MainWindow* 
 	executableTreeView(new QExecutableTreeView(q)),
 	executableModel(new QExecutableModel(q)),
 	testCaseProxyModel(new QBottomUpSortFilterProxy(q)),
-	addTestButton(new QPushButton(q)),
+        updateTestsButton(new QPushButton(q)),
 	fileWatcher(new QFileSystemWatcher(q)),
 	centralFrame(new QFrame(q)),
 	testCaseFilterEdit(new QLineEdit(q)),
@@ -80,9 +81,9 @@ MainWindowPrivate::MainWindowPrivate(QStringList tests, bool reset, MainWindow* 
 
 	executableDockFrame->setLayout(new QVBoxLayout);
 	executableDockFrame->layout()->addWidget(executableTreeView);
-	executableDockFrame->layout()->addWidget(addTestButton);
+        executableDockFrame->layout()->addWidget(updateTestsButton);
 
-	addTestButton->setText("Add Test Executable...");
+        updateTestsButton->setText("Update tests (search RunEnv)");
 
 	testCaseFilterEdit->setPlaceholderText("Filter Test Output...");
 	testCaseFilterEdit->setClearButtonEnabled(true);
@@ -151,8 +152,18 @@ MainWindowPrivate::MainWindowPrivate(QStringList tests, bool reset, MainWindow* 
 	connect(this, &MainWindowPrivate::testResultsReady, statusBar, &QStatusBar::clearMessage, Qt::QueuedConnection);
 	connect(this, &MainWindowPrivate::showMessage, statusBar, &QStatusBar::showMessage, Qt::QueuedConnection);
 
-	// Open dialog when 'add test' is clicked
-	connect(addTestButton, &QPushButton::clicked, addTestAction, &QAction::trigger);
+        // Update Tests
+        connect(updateTestsButton, &QPushButton::clicked, [this]()
+        {
+            if (runEnvPath_.isEmpty())
+            {
+                selectRunEnvAction->trigger();
+            }
+            else
+            {
+                updateTestExecutables();
+            }
+        });
 
 	// switch testCase models when new tests are clicked
 	connect(executableTreeView->selectionModel(), &QItemSelectionModel::selectionChanged, [this](const QItemSelection& selected, const QItemSelection& deselected)
@@ -407,7 +418,7 @@ QString MainWindowPrivate::xmlPath(const QString& testPath) const
 //--------------------------------------------------------------------------------------------------
 //	FUNCTION: addTestExecutable
 //--------------------------------------------------------------------------------------------------
-void MainWindowPrivate::addTestExecutable(const QString& path, bool autorun, QDateTime lastModified, 
+void MainWindowPrivate::addTestExecutable(const QString& path, const QString& testDriver, bool autorun, QDateTime lastModified,
 	QString filter /*= ""*/, int repeat /*= 0*/, Qt::CheckState runDisabled /*= Qt::Unchecked*/, 
 	Qt::CheckState shuffle /*= Qt::Unchecked*/, int randomSeed /*= 0*/, QString otherArgs /*= ""*/)
 {
@@ -416,7 +427,7 @@ void MainWindowPrivate::addTestExecutable(const QString& path, bool autorun, QDa
 	if (!fileinfo.exists())
 		return;
 
-	if (!fileinfo.isExecutable() || !fileinfo.isFile())
+        if (!fileinfo.isExecutable() || !fileinfo.isFile())
 		return;
 
 	if (executableModel->index(path).isValid())
@@ -433,6 +444,7 @@ void MainWindowPrivate::addTestExecutable(const QString& path, bool autorun, QDa
 
 	executableModel->setData(newRow, 0, QExecutableModel::ProgressRole);
 	executableModel->setData(newRow, path, QExecutableModel::PathRole);
+        executableModel->setData(newRow, testDriver, QExecutableModel::TestDriverRole);
 	executableModel->setData(newRow, autorun, QExecutableModel::AutorunRole);
 	executableModel->setData(newRow, lastModified, QExecutableModel::LastModifiedRole);
 	executableModel->setData(newRow, ExecutableData::NOT_RUNNING, QExecutableModel::StateRole);
@@ -544,8 +556,13 @@ void MainWindowPrivate::runTestInThread(const QString& pathToTest, bool notify)
 
 		// SET GTEST ARGS
 		QModelIndex index = executableModel->index(pathToTest);
+                QString testDriver = executableModel->data(index, QExecutableModel::TestDriverRole).toString();
 
-		QStringList arguments("--gtest_output=xml:" + this->xmlPath(pathToTest));
+                QStringList arguments(testDriver);
+
+                arguments << "--build-config " + info.dir().dirName();
+
+                arguments << "--gtest_output=xml:\"" + this->xmlPath(pathToTest) + "\"";
 
 		QString filter = executableModel->data(index, QExecutableModel::FilterRole).toString();
 		if (!filter.isEmpty()) arguments << "--gtest_filter=" + filter;
@@ -569,10 +586,12 @@ void MainWindowPrivate::runTestInThread(const QString& pathToTest, bool notify)
 
 		// Set working directory to be the same as the executable
 		// (common standard for tests to find test-data files)
-		testProcess.setWorkingDirectory(QFileInfo(pathToTest).dir().path());
+                testProcess.setWorkingDirectory(QFileInfo(testDriver).dir().path());
+
+                QString cmd = "\"" + runEnvPath_ + "\" && py";
 
 		// Start the test
-		testProcess.start(pathToTest, arguments);
+                testProcess.start(cmd, arguments);
 
 		// get the first line of output. If we don't get it in a timely manner, the test is
 		// probably bugged out so kill it.
@@ -758,6 +777,7 @@ void MainWindowPrivate::saveSettings() const
 		index = index.sibling(index.row(), QExecutableModel::NameColumn);
 		settings.setArrayIndex(index.row());
 		settings.setValue("path", index.data(QExecutableModel::PathRole).toString());
+                settings.setValue("testDriver", index.data(QExecutableModel::TestDriverRole).toString());
 		settings.setValue("autorun", index.data(QExecutableModel::AutorunRole).toBool());
 		settings.setValue("lastModified", index.data(QExecutableModel::LastModifiedRole).toDateTime());
 		settings.setValue("filter", index.data(QExecutableModel::FilterRole).toString());
@@ -774,7 +794,7 @@ void MainWindowPrivate::saveSettings() const
 		settings.setValue("notifyOnFailure", notifyOnFailureAction->isChecked());
 		settings.setValue("notifyOnSuccess", notifyOnSuccessAction->isChecked());
 		settings.setValue("theme", themeActionGroup->checkedAction()->objectName());
-		settings.setValue("testDirectory", m_testDirectory);
+                settings.setValue("runEnvPath", runEnvPath_);
 	}
 	settings.endGroup();
 }
@@ -795,6 +815,7 @@ void MainWindowPrivate::loadSettings()
 	{
 		settings.setArrayIndex(i);
 		QString path = settings.value("path").toString();
+                QString testDriver = settings.value("testDriver").toString();
 		bool autorun = settings.value("autorun").toBool();
 		QDateTime lastModified = settings.value("lastModified").toDateTime();
 		QString filter = settings.value("filter").toString();
@@ -804,7 +825,7 @@ void MainWindowPrivate::loadSettings()
 		int seed = settings.value("seed").toInt();
 		QString args = settings.value("args").toString();
 
-		addTestExecutable(path, autorun, lastModified, filter, repeat, runDisabled, shuffle, seed, args);
+                addTestExecutable(path, testDriver, autorun, lastModified, filter, repeat, runDisabled, shuffle, seed, args);
 	}
 	settings.endArray();
 
@@ -813,7 +834,7 @@ void MainWindowPrivate::loadSettings()
 		if (!settings.value("notifyOnFailure").isNull()) notifyOnFailureAction->setChecked(settings.value("notifyOnFailure").toBool());
 		if (!settings.value("notifyOnSuccess").isNull()) notifyOnSuccessAction->setChecked(settings.value("notifyOnSuccess").toBool());
 		settings.value("theme").isNull() ? defaultThemeAction->setChecked(true) : themeMenu->findChild<QAction*>(settings.value("theme").toString())->trigger();
-		settings.value("testDirectory").isNull() ? m_testDirectory = QStandardPaths::standardLocations(QStandardPaths::HomeLocation).first() : m_testDirectory = settings.value("testDirectory").toString();
+                if (!settings.value("runEnvPath").isNull()) runEnvPath_ = settings.value("runEnvPath").toString();
 	}
 	settings.endGroup();
 }
@@ -917,7 +938,6 @@ void MainWindowPrivate::createExecutableContextMenu()
 	executableContextMenu->addAction(runTestAction);
 	executableContextMenu->addAction(killTestAction);
 	executableContextMenu->addSeparator();	
-	executableContextMenu->addAction(addTestAction);
 	executableContextMenu->addAction(removeTestAction);
 	executableContextMenu->addAction(selectAndRemoveTestAction);
 
@@ -1032,7 +1052,7 @@ void MainWindowPrivate::createTestMenu()
 
 	testMenu = new QMenu("Test", q);
 
-	addTestAction = new QAction(QIcon(":/images/green"), "Add Test...", q);
+        selectRunEnvAction = new QAction(QIcon(":/images/green"), "Select RunEnv...", q);
 	selectAndRemoveTestAction = new QAction(q->style()->standardIcon(QStyle::SP_TrashIcon), "Remove Test...", testMenu);
 	selectAndRunTest = new QAction(q->style()->standardIcon(QStyle::SP_BrowserReload), "Run Test...", testMenu);
 	selectAndRunTest->setShortcut(QKeySequence(Qt::SHIFT + Qt::Key_F5));
@@ -1041,7 +1061,7 @@ void MainWindowPrivate::createTestMenu()
 	selectAndKillTest = new QAction(q->style()->standardIcon(QStyle::SP_DialogCloseButton), "Kill Test...", testMenu);
 	selectAndKillTest->setShortcut(QKeySequence(Qt::CTRL + Qt::SHIFT + Qt::Key_F5));
 
-	testMenu->addAction(addTestAction);
+        testMenu->addAction(selectRunEnvAction);
 	testMenu->addAction(selectAndRemoveTestAction);
 	testMenu->addSeparator();
 	testMenu->addAction(selectAndRunTest);
@@ -1050,37 +1070,27 @@ void MainWindowPrivate::createTestMenu()
 
 	q->menuBar()->addMenu(testMenu);
 
-	connect(addTestAction, &QAction::triggered,	[this]()
+        connect(selectRunEnvAction, &QAction::triggered, [this]()
 	{
 		QString filter;
 #ifdef Q_OS_WIN32
-		filter = "Test Executables (*.exe)";
+		filter = "RunEnv (*.bat)";
 #else
-		filter = "Test Executables (*)";
+                // TODO: extend filter?
+		filter = "RunEnv (*.sh)";
 #endif
-		QString filename = "";
-		QStringList filenames = QFileDialog::getOpenFileNames(q_ptr, "Select Test Executable", m_testDirectory, filter);
+                QString filename = QFileDialog::getOpenFileName(q_ptr, "Select RunEnv.bat/sh", runEnvPath_, filter);
 
-		if (filenames.isEmpty())
-			return;
+                if (filename.isEmpty())
+                {
+                    return;
+                }
 		else
 		{
-			foreach(QString filename, filenames)
-			{
-				QFileInfo info(filename);
-				m_testDirectory = info.absoluteDir().absolutePath();
-
-				QModelIndex existingIndex = executableModel->index(filename);
-				if (!existingIndex.isValid())
-					addTestExecutable(filename, true, QFileInfo(filename).lastModified());
-				else
-					executableTreeView->setCurrentIndex(existingIndex);
-			}
-
-			
+                    QFileInfo info(filename);
+                    runEnvPath_ = info.absoluteFilePath();
+                    updateTestExecutables();
 		}
-
-		
 	});
 
 	connect(selectAndRemoveTestAction, &QAction::triggered, [this]
@@ -1112,6 +1122,52 @@ void MainWindowPrivate::createTestMenu()
 			if (QMessageBox::question(q, "Kill Test?", "Are you sure you want to kill test: " + name + "?", QMessageBox::Yes, QMessageBox::No) == QMessageBox::Yes)
 				emit killTest(index.data(QExecutableModel::PathRole).toString());
 	});
+}
+
+void MainWindowPrivate::updateTestExecutables()
+{
+    static QStringList cmakeBuildTypes = { "Debug", "Release", "RelWithDebInfo", "MinSizeRel" };
+    static QStringList testDriverFilter = { "TestDriver.py" };
+#ifdef Q_OS_WIN32
+    static QStringList exeFilter = { "*.exe" };
+#else
+    // TODO: is this correct?
+    static QStringList exeFilter;
+#endif
+
+    if (runEnvPath_.isEmpty())
+    {
+        return;
+    }
+
+    QDir homeBase;
+#ifdef Q_OS_WIN32
+    homeBase = QFileInfo(runEnvPath_).dir();
+#else
+    // TODO: make for env.sh
+    return;
+#endif
+
+    // TODO delete old exes
+
+    homeBase.setNameFilters(testDriverFilter);
+    QDirIterator it(homeBase, QDirIterator::Subdirectories);
+    while (it.hasNext())
+    {
+        QFileInfo testDriverFileInfo(it.next());
+        
+        for (const auto& cmakeBuildType : cmakeBuildTypes)
+        {
+            QDir pathToExeDir = testDriverFileInfo.absoluteDir();
+            if (pathToExeDir.cd(cmakeBuildType))
+            {
+                for (const auto& exeFileInfo : pathToExeDir.entryInfoList(exeFilter))
+                {
+                    addTestExecutable(exeFileInfo.absoluteFilePath(), testDriverFileInfo.absoluteFilePath(), false, exeFileInfo.lastModified());
+                }
+            }
+        }
+    }
 }
 
 //--------------------------------------------------------------------------------------------------
