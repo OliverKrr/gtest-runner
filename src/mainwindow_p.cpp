@@ -539,7 +539,12 @@ void MainWindowPrivate::runTestInThread(const QString& pathToTest, bool notify)
 		// get killed if asked to do so
 		connect(this, &MainWindowPrivate::killTest, &loop, [&, pathToTest]
 		{
-			testProcess.kill();
+                        testProcess.terminate();
+                        // Give 0.5s to finish
+                        if (!testProcess.waitForFinished(500))
+                        {
+                            testProcess.kill();
+                        }
 			QString output = testProcess.readAllStandardOutput();
 			output.append("\nTEST RUN KILLED: " + QDateTime::currentDateTime().toString("yyyy-MMM-dd hh:mm:ss.zzz") + "\n\n");
 
@@ -1161,9 +1166,21 @@ void MainWindowPrivate::updateTestExecutables()
             QDir pathToExeDir = testDriverFileInfo.absoluteDir();
             if (pathToExeDir.cd(cmakeBuildType))
             {
-                for (const auto& exeFileInfo : pathToExeDir.entryInfoList(exeFilter))
+                // Get test executable with list_test_exe option
+                QProcess testProcess;
+                QStringList arguments(testDriverFileInfo.absoluteFilePath());
+                arguments << "--build-config " + cmakeBuildType;
+                arguments << "--list_test_exe";
+                testProcess.start("py", arguments);
+
+                if (testProcess.waitForFinished(500))
                 {
-                    addTestExecutable(exeFileInfo.absoluteFilePath(), testDriverFileInfo.absoluteFilePath(), false, exeFileInfo.lastModified());
+                    QString output = testProcess.readAllStandardOutput().trimmed();
+                    addTestExecutable(output, testDriverFileInfo.absoluteFilePath(), false, QDateTime());
+                }
+                else
+                {
+                    testProcess.kill();
                 }
             }
         }
