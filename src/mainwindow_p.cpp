@@ -539,7 +539,9 @@ void MainWindowPrivate::runTestInThread(const QString& pathToTest, bool notify)
 		// get killed if asked to do so
 		connect(this, &MainWindowPrivate::killTest, &loop, [&, pathToTest]
 		{
-                        testProcess.terminate();
+                        // terminate over std::in, as terminate() sends WM_CLOSE under windows that is complex to catch
+                        testProcess.write("terminate");
+                        testProcess.closeWriteChannel();
                         // Give 0.5s to finish
                         if (!testProcess.waitForFinished(500))
                         {
