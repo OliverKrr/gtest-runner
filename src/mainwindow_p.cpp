@@ -513,10 +513,12 @@ void MainWindowPrivate::runTestInThread(const QString& pathToTest, bool notify)
 		int progress = 0;
 
 		// when the process finished, read any remaining output then quit the loop
-		connect(&testProcess, static_cast<void (QProcess::*)(int)>(&QProcess::finished), &loop, [&, pathToTest]
+                connect(&testProcess, static_cast<void (QProcess::*)(int, QProcess::ExitStatus)>(&QProcess::finished), &loop, [&, pathToTest]
+                        (int exitCode, QProcess::ExitStatus exitStatus)
 		{
 			QString output = testProcess.readAllStandardOutput();
-			if(testProcess.exitStatus() == QProcess::NormalExit)
+                        // 0 for success and 1 if test have failed -> in both cases a result xml was generated
+                        if (exitStatus == QProcess::NormalExit && (exitCode == 0 || exitCode == 1))
 			{
 				output.append("\nTEST RUN COMPLETED: " + QDateTime::currentDateTime().toString("yyyy-MMM-dd hh:mm:ss.zzz") + "\n\n");
 				emit testResultsReady(pathToTest, notify);
