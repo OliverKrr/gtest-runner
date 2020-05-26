@@ -1133,14 +1133,7 @@ void MainWindowPrivate::createTestMenu()
 
 void MainWindowPrivate::updateTestExecutables()
 {
-    static QStringList cmakeBuildTypes = { "Debug", "Release", "RelWithDebInfo", "MinSizeRel" };
     static QStringList testDriverFilter = { "TestDriver.py" };
-#ifdef Q_OS_WIN32
-    static QStringList exeFilter = { "*.exe" };
-#else
-    // TODO: is this correct?
-    static QStringList exeFilter;
-#endif
 
     if (runEnvPath_.isEmpty())
     {
@@ -1163,28 +1156,23 @@ void MainWindowPrivate::updateTestExecutables()
     {
         QFileInfo testDriverFileInfo(it.next());
         
-        for (const auto& cmakeBuildType : cmakeBuildTypes)
-        {
-            QDir pathToExeDir = testDriverFileInfo.absoluteDir();
-            if (pathToExeDir.cd(cmakeBuildType))
-            {
-                // Get test executable with list_test_exe option
-                QProcess testProcess;
-                QStringList arguments(testDriverFileInfo.absoluteFilePath());
-                arguments << "--build-config " + cmakeBuildType;
-                arguments << "--list_test_exe";
-                testProcess.start("py", arguments);
+        // Get test executables with list-test-exess option
+        QProcess testProcess;
+        QStringList arguments(testDriverFileInfo.absoluteFilePath());
+        arguments << "--list-test-exes";
+        testProcess.start("py", arguments);
 
-                if (testProcess.waitForFinished(500))
-                {
-                    QString output = testProcess.readAllStandardOutput().trimmed();
-                    addTestExecutable(output, testDriverFileInfo.absoluteFilePath(), false, QDateTime());
-                }
-                else
-                {
-                    testProcess.kill();
-                }
+        if (testProcess.waitForFinished(500))
+        {
+            QString output = testProcess.readAllStandardOutput();
+            for (const auto& testExe : output.split(QRegExp("[\r\n]"), QString::SkipEmptyParts))
+            {
+                addTestExecutable(testExe.trimmed(), testDriverFileInfo.absoluteFilePath(), false, QDateTime());
             }
+        }
+        else
+        {
+            testProcess.kill();
         }
     }
 }
