@@ -500,7 +500,7 @@ void MainWindowPrivate::runTestInThread(const QString& pathToTest, bool notify)
 			std::unique_lock<std::mutex> lock(threadKillMutex);
 			threadKillCv.wait(lock, [&, pathToTest] {return !testRunningHash[pathToTest]; });
 		}
-		
+
 		testRunningHash[pathToTest] = true;
 
 		executableModel->setData(executableModel->index(pathToTest), ExecutableData::RUNNING, QExecutableModel::StateRole);
@@ -533,14 +533,19 @@ void MainWindowPrivate::runTestInThread(const QString& pathToTest, bool notify)
 			emit testProgress(pathToTest, 0, 0);
 
 			testRunningHash[pathToTest] = false;
-			threadKillCv.notify_one();
+			threadKillCv.notify_all();
 
 			loop.exit();
 		}, Qt::QueuedConnection);
 
 		// get killed if asked to do so
 		connect(this, &MainWindowPrivate::killTest, &loop, [&, pathToTest]
+                        (const QString& pathToTestToKill)
 		{
+                        if (pathToTest != pathToTestToKill)
+                        {
+                            return;
+                        }
                         // terminate over std::in, as terminate() sends WM_CLOSE under windows that is complex to catch
                         testProcess.write("terminate");
                         testProcess.closeWriteChannel();
@@ -558,10 +563,19 @@ void MainWindowPrivate::runTestInThread(const QString& pathToTest, bool notify)
 			emit testProgress(pathToTest, 0, 0);
 
 			testRunningHash[pathToTest] = false;
-			threadKillCv.notify_one();
+			threadKillCv.notify_all();
 
 			loop.exit();
 		}, Qt::QueuedConnection);
+
+
+                // don't lock by default -> only if runTestsSynchronousAction_ is checked
+                std::unique_lock<std::mutex> runTestThreadSynchronousLock(runTestThreadSynchronous_, std::defer_lock);
+                if (runTestsSynchronousAction_->isChecked())
+                {
+                    runTestThreadSynchronousLock.lock();
+                }
+
 
 		// SET GTEST ARGS
 		QModelIndex index = executableModel->index(pathToTest);
@@ -652,7 +666,7 @@ void MainWindowPrivate::runTestInThread(const QString& pathToTest, bool notify)
 		loop.exec();
 
 	});
-	t.detach();
+        t.detach();
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -806,6 +820,7 @@ void MainWindowPrivate::saveSettings() const
 
 	settings.beginGroup("options");
 	{
+                settings.setValue("runTestsSynchronous", runTestsSynchronousAction_->isChecked());
 		settings.setValue("notifyOnFailure", notifyOnFailureAction->isChecked());
 		settings.setValue("notifyOnSuccess", notifyOnSuccessAction->isChecked());
 		settings.setValue("theme", themeActionGroup->checkedAction()->objectName());
@@ -846,6 +861,7 @@ void MainWindowPrivate::loadSettings()
 
 	settings.beginGroup("options");
 	{
+                if (!settings.value("runTestsSynchronous").isNull()) runTestsSynchronousAction_->setChecked(settings.value("runTestsSynchronous").toBool());
 		if (!settings.value("notifyOnFailure").isNull()) notifyOnFailureAction->setChecked(settings.value("notifyOnFailure").toBool());
 		if (!settings.value("notifyOnSuccess").isNull()) notifyOnSuccessAction->setChecked(settings.value("notifyOnSuccess").toBool());
 		settings.value("theme").isNull() ? defaultThemeAction->setChecked(true) : themeMenu->findChild<QAction*>(settings.value("theme").toString())->trigger();
@@ -1070,11 +1086,13 @@ void MainWindowPrivate::createTestMenu()
         selectRunEnvAction = new QAction(QIcon(":/images/green"), "Select RunEnv...", q);
 	selectAndRemoveTestAction = new QAction(q->style()->standardIcon(QStyle::SP_TrashIcon), "Remove Test...", testMenu);
 	selectAndRunTest = new QAction(q->style()->standardIcon(QStyle::SP_BrowserReload), "Run Test...", testMenu);
-	selectAndRunTest->setShortcut(QKeySequence(Qt::SHIFT + Qt::Key_F5));
+	selectAndRunTest->setShortcut(QKeySequence(Qt::Key_F5));
 	selectAndRunAllTest = new QAction(q->style()->standardIcon(QStyle::SP_BrowserReload), "Run All Test...", testMenu);
-	selectAndRunAllTest->setShortcut(QKeySequence(Qt::CTRL + Qt::Key_F5));
+	selectAndRunAllTest->setShortcut(QKeySequence(Qt::Key_F6));
 	selectAndKillTest = new QAction(q->style()->standardIcon(QStyle::SP_DialogCloseButton), "Kill Test...", testMenu);
-	selectAndKillTest->setShortcut(QKeySequence(Qt::CTRL + Qt::SHIFT + Qt::Key_F5));
+	selectAndKillTest->setShortcut(QKeySequence(Qt::SHIFT + Qt::Key_F5));
+        selectAndKillAllTest_ = new QAction(q->style()->standardIcon(QStyle::SP_DialogCloseButton), "Kill All Test...", testMenu);
+        selectAndKillAllTest_->setShortcut(QKeySequence(Qt::SHIFT + Qt::Key_F6));
 
         testMenu->addAction(selectRunEnvAction);
 	testMenu->addAction(selectAndRemoveTestAction);
@@ -1082,6 +1100,7 @@ void MainWindowPrivate::createTestMenu()
 	testMenu->addAction(selectAndRunTest);
 	testMenu->addAction(selectAndRunAllTest);
 	testMenu->addAction(selectAndKillTest);
+        testMenu->addAction(selectAndKillAllTest_);
 
 	q->menuBar()->addMenu(testMenu);
 
@@ -1137,6 +1156,18 @@ void MainWindowPrivate::createTestMenu()
 			if (QMessageBox::question(q, "Kill Test?", "Are you sure you want to kill test: " + name + "?", QMessageBox::Yes, QMessageBox::No) == QMessageBox::Yes)
 				emit killTest(index.data(QExecutableModel::PathRole).toString());
 	});
+
+        connect(selectAndKillAllTest_, &QAction::triggered, [this, q]
+        {
+            if (QMessageBox::question(q, "Kill All Test?", "Are you sure you want to kill all test?", QMessageBox::Yes, QMessageBox::No) == QMessageBox::Yes)
+            {
+                for (size_t i = 0; i < executableTreeView->model()->rowCount(); ++i)
+                {
+                    QModelIndex index = executableTreeView->model()->index(i, 0);
+                    emit killTest(index.data(QExecutableModel::PathRole).toString());
+                }
+            }
+        });
 }
 
 void MainWindowPrivate::updateTestExecutables()
@@ -1194,13 +1225,17 @@ void MainWindowPrivate::createOptionsMenu()
 
 	optionsMenu = new QMenu("Options", q);
 
+        runTestsSynchronousAction_ = new QAction("Run tests synchronous and not in parallel", optionsMenu);
 	notifyOnFailureAction = new QAction("Notify on auto-run Failure", optionsMenu);
 	notifyOnSuccessAction = new QAction("Notify on auto-run Success", optionsMenu);
+        runTestsSynchronousAction_->setCheckable(true);
+        runTestsSynchronousAction_->setChecked(true);
 	notifyOnFailureAction->setCheckable(true);
 	notifyOnFailureAction->setChecked(true);
 	notifyOnSuccessAction->setCheckable(true);
 	notifyOnSuccessAction->setChecked(false);
 
+        optionsMenu->addAction(runTestsSynchronousAction_);
 	optionsMenu->addAction(notifyOnFailureAction);
 	optionsMenu->addAction(notifyOnSuccessAction);
 

@@ -146,6 +146,8 @@ public:
 	QAction*								removeTestAction;						///< Removes a test from being watched.
 	
 	QMenu*									optionsMenu;							///< Menu to set system options
+        // Enable synchronous test execution
+        QAction* runTestsSynchronousAction_;
 	QAction*								notifyOnFailureAction;					///< Enable failure notifications
 	QAction*								notifyOnSuccessAction;					///< Enable success notifications
 
@@ -154,6 +156,8 @@ public:
 	QMenu*									testMenu;								///< Menu for test-related actions
         QAction*								selectRunEnvAction;							///< Opens a dialog to select _RunEnv
 	QAction*								selectAndKillTest;						///< Selects and kills a running test.
+        // Kills all running test
+        QAction* selectAndKillAllTest_;
 	QAction*								selectAndRemoveTestAction;				///< Remove a test after choosing it from a list.
 	QAction*								selectAndRunTest;						///< Run a test after selecting it from a list.																	///< program options.
 	QAction*								selectAndRunAllTest;					///< Run all tests in the list.
@@ -184,6 +188,8 @@ public:
 	// synchronization
 	std::mutex								threadKillMutex;						
 	std::condition_variable					threadKillCv;							///< Condition variable that is notified when a thread is killed.
+        // Mutex to start (and run) tests synchronous
+        std::mutex runTestThreadSynchronous_;
 
 signals:
 
