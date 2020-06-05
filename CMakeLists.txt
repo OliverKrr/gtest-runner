@@ -99,7 +99,7 @@ endif(MSVC)
 
 set(APPLICATION_NAME ${TARGET_NAME})
 set(APPLICATION_VERSION ${VERSION})
-set(APPLICATION_ORGANIZATION "Menari Softworks")
+set(APPLICATION_ORGANIZATION "OliverKrr")
 set(APPLICATION_ORGANIZATION_DOMAIN "https://github.com/nholthaus/gtest-runner")
 
 configure_file(src/appinfo.h.in appinfo.h @ONLY NEWLINE_STYLE UNIX)

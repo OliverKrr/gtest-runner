@@ -1322,7 +1322,7 @@ void MainWindowPrivate::createHelpMenu()
 		msgBox.setIconPixmap(QPixmap(":images/logo").scaled(128, 128, Qt::KeepAspectRatio, Qt::SmoothTransformation));
 		msgBox.setTextFormat(Qt::RichText);   //this is what makes the links clickable
 		msgBox.setText("Application: " + APPINFO::name + "<br>version: " + APPINFO::version +
-			"<br>Developer: Nic Holthaus" + "<br>Organization: " + APPINFO::organization + "<br>Website: <a href='" + APPINFO::oranizationDomain + "'>" + APPINFO::oranizationDomain + "</a>" + "<br><br>" + 
+			"<br>Developer: Oliver Karrenbauer" + "<br>Organization: " + APPINFO::organization + "<br>Website: <a href='" + APPINFO::oranizationDomain + "'>" + APPINFO::oranizationDomain + "</a>" + "<br><br>" + 
 			"The MIT License (MIT)<br><br>\
 			\
 			Copyright(c) 2016 Nic Holthaus<br><br>\
