@@ -1424,7 +1424,7 @@ void MainWindowPrivate::createOptionsMenu()
 	notifyOnFailureAction = new QAction("Notify on auto-run Failure", optionsMenu);
 	notifyOnSuccessAction = new QAction("Notify on auto-run Success", optionsMenu);
         runTestsSynchronousAction_->setCheckable(true);
-        runTestsSynchronousAction_->setChecked(true);
+        runTestsSynchronousAction_->setChecked(false);
 	notifyOnFailureAction->setCheckable(true);
 	notifyOnFailureAction->setChecked(true);
 	notifyOnSuccessAction->setCheckable(true);
