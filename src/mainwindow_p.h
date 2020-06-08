@@ -79,7 +79,6 @@
 #include <QPersistentModelIndex>
 #include <QProcess>
 #include <QPushButton>
-#include <QSettings>
 #include <QShortcut>
 #include <QStandardItem>
 #include <QStandardItemModel>
@@ -88,6 +87,9 @@
 #include <QSystemTrayIcon>
 #include <QTextEdit>
 #include <QTreeView>
+#include <QToolBar>
+#include <QStringListModel>
+#include <QComboBox>
 
 #include <qglobal.h>
 
@@ -107,8 +109,11 @@ public:
 
 	// GUI components
 
-	MainWindow*								q_ptr;
-	
+        MainWindow*								q_ptr;
+        QToolBar* toolBar_;
+        // ComboBox and model to choose RunEnv
+        QComboBox* runEnvComboBox_;
+        QStringListModel* runEnvModel_;
 	QDockWidget*							executableDock;							///< Dock Widget for the gtest executable selector.
 	QFrame*									executableDockFrame;					///< Frame for containing the dock's sub-widgets
 	QExecutableTreeView*					executableTreeView;						///< Widget to display and select gtest executables	
@@ -154,7 +159,7 @@ public:
 	QMenu*									windowMenu;								///< Menu to display/change dock visibility.
 
 	QMenu*									testMenu;								///< Menu for test-related actions
-        QAction*								selectRunEnvAction;							///< Opens a dialog to select _RunEnv
+        QAction*								addRunEnvAction;							///< Opens a dialog to add a new _RunEnv
 	QAction*								selectAndKillTest;						///< Selects and kills a running test.
         // Kills all running test
         QAction* selectAndKillAllTest_;
@@ -212,7 +217,8 @@ public:
 	void selectTest(const QString& testPath);
 	void saveSettings() const;
 	void loadSettings();
-	void removeTest(const QModelIndex &index);
+        void removeAllTest(const bool confirm = false);
+	void removeTest(const QModelIndex &index, const bool confirm = false);
 	void clearData();
 	void clearSettings();
         void updateTestExecutables();
@@ -228,14 +234,26 @@ protected:
 	void createExecutableContextMenu();
 	void createTestCaseViewContextMenu();
 	void createConsoleContextMenu();
+        void createToolBar();
 
 	QModelIndex getTestIndexDialog(const QString& label, bool running = false);
 
 	void scrollToConsoleCursor();
+
+        void saveCommonSettings(const QString& path) const;
+        void saveTestSettingsForCurrentRunEnv() const;
+        void saveTestSettings(const QString& path) const;
+        void loadCommonSettings(const QString& path);
+        void loadTestSettingsForCurrentRunEnv();
+        void loadTestSettings(const QString& path);
+
+
+        QString settingsPath() const;
+        QString dataPath() const;
 	
 private:
 
-	QString runEnvPath_;
+	QString currentRunEnvPath_;
 
 };	// CLASS: MainWindowPrivate
 

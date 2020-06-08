@@ -16,12 +16,18 @@
 #include <QStack>
 #include <QStyle>
 #include <QDirIterator>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonArray>
 
 //--------------------------------------------------------------------------------------------------
 //	FUNCTION: MainWindowPrivate
 //--------------------------------------------------------------------------------------------------
 MainWindowPrivate::MainWindowPrivate(QStringList tests, bool reset, MainWindow* q) :
 	q_ptr(q),
+        toolBar_(new QToolBar(q)),
+        runEnvComboBox_(new QComboBox(toolBar_)),
+        runEnvModel_(new QStringListModel(toolBar_)),
 	executableDock(new QDockWidget(q)),
 	executableDockFrame(new QFrame(q)),
 	executableTreeView(new QExecutableTreeView(q)),
@@ -147,6 +153,8 @@ MainWindowPrivate::MainWindowPrivate(QStringList tests, bool reset, MainWindow* 
 	createConsoleContextMenu();
 	createTestCaseViewContextMenu();
 
+        createToolBar();
+
 	connect(this, &MainWindowPrivate::setStatus, statusBar, &QStatusBar::setStatusTip, Qt::QueuedConnection);
 	connect(this, &MainWindowPrivate::testResultsReady, this, &MainWindowPrivate::loadTestResults, Qt::QueuedConnection);
 	connect(this, &MainWindowPrivate::testResultsReady, statusBar, &QStatusBar::clearMessage, Qt::QueuedConnection);
@@ -155,9 +163,9 @@ MainWindowPrivate::MainWindowPrivate(QStringList tests, bool reset, MainWindow* 
         // Update Tests
         connect(updateTestsButton, &QPushButton::clicked, [this]()
         {
-            if (runEnvPath_.isEmpty())
+            if (currentRunEnvPath_.isEmpty())
             {
-                selectRunEnvAction->trigger();
+                addRunEnvAction->trigger();
             }
             else
             {
@@ -412,7 +420,7 @@ QString MainWindowPrivate::xmlPath(const QString& testPath) const
 {
 	QFileInfo testInfo(testPath);
 	QString hash = QCryptographicHash::hash(testPath.toLatin1(), QCryptographicHash::Md5).toHex();
-	return QStandardPaths::standardLocations(QStandardPaths::AppDataLocation).first() + "/" + hash + ".xml";
+        return dataPath() + "/" + hash + ".xml";
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -611,7 +619,7 @@ void MainWindowPrivate::runTestInThread(const QString& pathToTest, bool notify)
 		// (common standard for tests to find test-data files)
                 testProcess.setWorkingDirectory(QFileInfo(testDriver).dir().path());
 
-                QString cmd = "\"" + runEnvPath_ + "\" && py";
+                QString cmd = "\"" + currentRunEnvPath_ + "\" && py";
 
 		// Start the test
                 testProcess.start(cmd, arguments);
@@ -792,41 +800,92 @@ void MainWindowPrivate::selectTest(const QString& testPath)
 //--------------------------------------------------------------------------------------------------
 void MainWindowPrivate::saveSettings() const
 {
-	Q_Q(const MainWindow);
-	QSettings settings(APPINFO::organization, APPINFO::name);
-	settings.setValue("geometry", q->saveGeometry());
-	settings.setValue("windowState", q->saveState());
-	consoleFindDialog->writeSettings(settings);
-	
-	// save executable information
-	settings.beginWriteArray("tests");
-	for (auto itr = executableModel->begin(); itr != executableModel->end(); ++itr)
-	{
-		QModelIndex index = executableModel->iteratorToIndex(itr);
-		index = index.sibling(index.row(), QExecutableModel::NameColumn);
-		settings.setArrayIndex(index.row());
-		settings.setValue("path", index.data(QExecutableModel::PathRole).toString());
-                settings.setValue("testDriver", index.data(QExecutableModel::TestDriverRole).toString());
-		settings.setValue("autorun", index.data(QExecutableModel::AutorunRole).toBool());
-		settings.setValue("lastModified", index.data(QExecutableModel::LastModifiedRole).toDateTime());
-		settings.setValue("filter", index.data(QExecutableModel::FilterRole).toString());
-		settings.setValue("repeat", index.data(QExecutableModel::RepeatTestsRole).toInt());
-		settings.setValue("runDisabled", index.data(QExecutableModel::RunDisabledTestsRole).toInt());
-		settings.setValue("shuffle", index.data(QExecutableModel::ShuffleRole).toInt());
-		settings.setValue("seed", index.data(QExecutableModel::RandomSeedRole).toInt());
-		settings.setValue("args", index.data(QExecutableModel::ArgsRole).toString());
-	}
-	settings.endArray();
+    QDir settingsDir(settingsPath());
+    if (!settingsDir.exists())
+    {
+        settingsDir.mkpath(".");
+    }
 
-	settings.beginGroup("options");
-	{
-                settings.setValue("runTestsSynchronous", runTestsSynchronousAction_->isChecked());
-		settings.setValue("notifyOnFailure", notifyOnFailureAction->isChecked());
-		settings.setValue("notifyOnSuccess", notifyOnSuccessAction->isChecked());
-		settings.setValue("theme", themeActionGroup->checkedAction()->objectName());
-                settings.setValue("runEnvPath", runEnvPath_);
-	}
-	settings.endGroup();
+    saveCommonSettings(settingsPath() + "/" + "settings.json");
+    // Only save current -> multiple instances of gtest-runner don't overwrite each other
+    saveTestSettingsForCurrentRunEnv();
+}
+
+void MainWindowPrivate::saveCommonSettings(const QString& path) const
+{
+    Q_Q(const MainWindow);
+
+    QJsonObject root;
+    auto data = q->saveGeometry();
+    root.insert("geometry", QLatin1String(data.constData(), data.size()));
+    data = q->saveState();
+    root.insert("windowState", QLatin1String(data.constData(), data.size()));
+    consoleFindDialog->writeSettings(root);
+
+    root.insert("runEnvs", QJsonArray::fromStringList(runEnvModel_->stringList()));
+
+    QJsonObject options;
+    options.insert("runTestsSynchronous", runTestsSynchronousAction_->isChecked());
+    options.insert("notifyOnFailure", notifyOnFailureAction->isChecked());
+    options.insert("notifyOnSuccess", notifyOnSuccessAction->isChecked());
+    options.insert("theme", themeActionGroup->checkedAction()->objectName());
+    options.insert("currentRunEnvPath", currentRunEnvPath_);
+    root.insert("options", options);
+
+    QJsonDocument document(root);
+    QFile settingsFile(path);
+    if (!settingsFile.open(QIODevice::WriteOnly))
+    {
+        return;
+    }
+    settingsFile.write(document.toJson());
+    settingsFile.close();
+}
+
+void MainWindowPrivate::saveTestSettingsForCurrentRunEnv() const
+{
+    if (currentRunEnvPath_.isEmpty())
+    {
+        return;
+    }
+    QString hash = QCryptographicHash::hash(currentRunEnvPath_.toLatin1(), QCryptographicHash::Md5).toHex();
+    saveTestSettings(settingsPath() + "/" + hash + ".json");
+}
+
+void MainWindowPrivate::saveTestSettings(const QString& path) const
+{
+    Q_Q(const MainWindow);
+
+    QJsonObject root;
+    QJsonArray tests;
+    for (auto itr = executableModel->begin(); itr != executableModel->end(); ++itr)
+    {
+        QModelIndex index = executableModel->iteratorToIndex(itr);
+        index = index.sibling(index.row(), QExecutableModel::NameColumn);
+
+        QJsonObject test;
+        test.insert("path", QJsonValue::fromVariant(index.data(QExecutableModel::PathRole)));
+        test.insert("testDriver", QJsonValue::fromVariant(index.data(QExecutableModel::TestDriverRole)));
+        test.insert("autorun", QJsonValue::fromVariant(index.data(QExecutableModel::AutorunRole)));
+        test.insert("lastModified", index.data(QExecutableModel::LastModifiedRole).toDateTime().toString(Qt::DateFormat::ISODate));
+        test.insert("filter", QJsonValue::fromVariant(index.data(QExecutableModel::FilterRole)));
+        test.insert("repeat", QJsonValue::fromVariant(index.data(QExecutableModel::RepeatTestsRole)));
+        test.insert("runDisabled", QJsonValue::fromVariant(index.data(QExecutableModel::RunDisabledTestsRole)));
+        test.insert("shuffle", QJsonValue::fromVariant(index.data(QExecutableModel::ShuffleRole)));
+        test.insert("seed", QJsonValue::fromVariant(index.data(QExecutableModel::RandomSeedRole)));
+        test.insert("args", QJsonValue::fromVariant(index.data(QExecutableModel::ArgsRole)));
+        tests.append(test);
+    }
+    root.insert("tests", tests);
+
+    QJsonDocument document(root);
+    QFile settingsFile(path);
+    if (!settingsFile.open(QIODevice::WriteOnly))
+    {
+        return;
+    }
+    settingsFile.write(document.toJson());
+    settingsFile.close();
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -834,53 +893,138 @@ void MainWindowPrivate::saveSettings() const
 //--------------------------------------------------------------------------------------------------
 void MainWindowPrivate::loadSettings()
 {
-	Q_Q(MainWindow);
-	QSettings settings(APPINFO::organization, APPINFO::name);
-	q->restoreGeometry(settings.value("geometry").toByteArray());
-	q->restoreState(settings.value("windowState").toByteArray());
-	consoleFindDialog->readSettings(settings);
+    loadCommonSettings(settingsPath() + "/" + "settings.json");
+    // Only keep current in memory
+    loadTestSettingsForCurrentRunEnv();
 
-	int size = settings.beginReadArray("tests");
-	for (int i = 0; i < size; ++i)
-	{
-		settings.setArrayIndex(i);
-		QString path = settings.value("path").toString();
-                QString testDriver = settings.value("testDriver").toString();
-		bool autorun = settings.value("autorun").toBool();
-		QDateTime lastModified = settings.value("lastModified").toDateTime();
-		QString filter = settings.value("filter").toString();
-		int repeat = settings.value("repeat").toInt();
-		Qt::CheckState runDisabled = static_cast<Qt::CheckState>(settings.value("runDisabled").toInt());
-		Qt::CheckState shuffle = static_cast<Qt::CheckState>(settings.value("shuffle").toInt());
-		int seed = settings.value("seed").toInt();
-		QString args = settings.value("args").toString();
+    auto alreadyIndex = runEnvComboBox_->findText(currentRunEnvPath_);
+    if (alreadyIndex != -1)
+    {
+        runEnvComboBox_->setCurrentIndex(alreadyIndex);
+        return;
+    }
+}
 
-                addTestExecutable(path, testDriver, autorun, lastModified, filter, repeat, runDisabled, shuffle, seed, args);
-	}
-	settings.endArray();
+void MainWindowPrivate::loadCommonSettings(const QString& path)
+{
+    Q_Q(MainWindow);
+    QFile settingsFile(path);
+    if (!settingsFile.open(QIODevice::ReadOnly))
+    {
+        defaultThemeAction->setChecked(true);
+        return;
+    }
+    QJsonDocument document = QJsonDocument::fromJson(settingsFile.readAll());
+    settingsFile.close();
 
-	settings.beginGroup("options");
-	{
-                if (!settings.value("runTestsSynchronous").isNull()) runTestsSynchronousAction_->setChecked(settings.value("runTestsSynchronous").toBool());
-		if (!settings.value("notifyOnFailure").isNull()) notifyOnFailureAction->setChecked(settings.value("notifyOnFailure").toBool());
-		if (!settings.value("notifyOnSuccess").isNull()) notifyOnSuccessAction->setChecked(settings.value("notifyOnSuccess").toBool());
-		settings.value("theme").isNull() ? defaultThemeAction->setChecked(true) : themeMenu->findChild<QAction*>(settings.value("theme").toString())->trigger();
-                if (!settings.value("runEnvPath").isNull()) runEnvPath_ = settings.value("runEnvPath").toString();
-	}
-	settings.endGroup();
+    QJsonObject root = document.object();
+
+    q->restoreGeometry(root["geometry"].toString().toLatin1());
+    q->restoreState(root["windowState"].toString().toLatin1());
+    consoleFindDialog->readSettings(root);
+
+    for (const auto& runEnv : root["runEnvs"].toArray())
+    {
+        if (runEnvModel_->insertRow(runEnvModel_->rowCount()))
+        {
+            auto index = runEnvModel_->index(runEnvModel_->rowCount() - 1, 0);
+            runEnvModel_->setData(index, runEnv.toString());
+        }
+    }
+
+    QJsonObject options = root["options"].toObject();
+    runTestsSynchronousAction_->setChecked(options["runTestsSynchronous"].toBool());
+    notifyOnFailureAction->setChecked(options["notifyOnFailure"].toBool());
+    notifyOnSuccessAction->setChecked(options["notifyOnSuccess"].toBool());
+    themeMenu->findChild<QAction*>(options["theme"].toString())->trigger();
+    currentRunEnvPath_ = options["currentRunEnvPath"].toString();
+}
+
+void MainWindowPrivate::loadTestSettingsForCurrentRunEnv()
+{
+    if (currentRunEnvPath_.isEmpty())
+    {
+        return;
+    }
+    QString hash = QCryptographicHash::hash(currentRunEnvPath_.toLatin1(), QCryptographicHash::Md5).toHex();
+    loadTestSettings(settingsPath() + "/" + hash + ".json");
+}
+
+void MainWindowPrivate::loadTestSettings(const QString& path)
+{
+    Q_Q(const MainWindow);
+    QFile settingsFile(path);
+    if (!settingsFile.open(QIODevice::ReadOnly))
+    {
+        return;
+    }
+    QJsonDocument document = QJsonDocument::fromJson(settingsFile.readAll());
+    settingsFile.close();
+
+    QJsonObject root = document.object();
+    QJsonArray tests = root["tests"].toArray();
+
+    for (const auto& testRef : tests)
+    {
+        QJsonObject test = testRef.toObject();
+
+        QString path = test["path"].toString();
+        QString testDriver = test["testDriver"].toString();
+        bool autorun = test["autorun"].toBool();
+        QDateTime lastModified = QDateTime::fromString(test["lastModified"].toString(), Qt::DateFormat::ISODate);
+        QString filter = test["filter"].toString();
+        int repeat = test["repeat"].toInt();
+        Qt::CheckState runDisabled = static_cast<Qt::CheckState>(test["runDisabled"].toInt());
+        Qt::CheckState shuffle = static_cast<Qt::CheckState>(test["shuffle"].toInt());
+        int seed = test["seed"].toInt();
+        QString args = test["args"].toString();
+
+        addTestExecutable(path, testDriver, autorun, lastModified, filter, repeat, runDisabled, shuffle, seed, args);
+    }
+}
+
+void MainWindowPrivate::removeAllTest(const bool confirm)
+{
+    if (executableModel->rowCount() == 0)
+    {
+        // nothing to remove
+        return;
+    }
+
+    if (confirm || QMessageBox::question(this->q_ptr, "Remove All Test?", "Do you want to remove all tests?", QMessageBox::Yes, QMessageBox::No) == QMessageBox::Yes)
+    {
+        for (size_t i = 0; i < executableModel->rowCount(); ++i)
+        {
+            auto index = executableModel->index(i, 0);
+            QString path = index.data(QExecutableModel::PathRole).toString();
+
+            // remove all data related to this test
+            executablePaths.removeAll(path);
+            testResultsHash.remove(path);
+            fileWatcher->removePath(path);
+        }
+
+        QAbstractItemModel* oldFailureModel = failureProxyModel->sourceModel();
+        QAbstractItemModel* oldtestCaseModel = testCaseProxyModel->sourceModel();
+        failureProxyModel->setSourceModel(new GTestFailureModel(nullptr));
+        testCaseProxyModel->setSourceModel(new GTestModel(QDomDocument()));
+        delete oldFailureModel;
+        delete oldtestCaseModel;
+        executableModel->removeRows(0, executableModel->rowCount());
+    }
 }
 
 //--------------------------------------------------------------------------------------------------
 //	FUNCTION: removeTest
 //--------------------------------------------------------------------------------------------------
-void MainWindowPrivate::removeTest(const QModelIndex &index)
+void MainWindowPrivate::removeTest(const QModelIndex &index, const bool confirm)
 {
 	if (!index.isValid())
 		return;
 
 	QString path = index.data(QExecutableModel::PathRole).toString();
 
-	if (QMessageBox::question(this->q_ptr, QString("Remove Test?"), "Do you want to remove test " + index.data(QExecutableModel::NameRole).toString() + "?",
+        if (confirm || QMessageBox::question(this->q_ptr, QString("Remove Test?"), "Do you want to remove test " + index.data(QExecutableModel::NameRole).toString() + "?",
 		QMessageBox::Yes | QMessageBox::No, QMessageBox::No) == QMessageBox::Yes)
 	{
 		executableTreeView->setCurrentIndex(index);
@@ -906,7 +1050,7 @@ void MainWindowPrivate::removeTest(const QModelIndex &index)
 //--------------------------------------------------------------------------------------------------
 void MainWindowPrivate::clearData()
 {
-	QDir dataDir(QStandardPaths::standardLocations(QStandardPaths::AppDataLocation).first());
+	QDir dataDir(dataPath());
 	if (dataDir.exists())
 	{
 		dataDir.removeRecursively();
@@ -923,8 +1067,11 @@ void MainWindowPrivate::clearData()
 //--------------------------------------------------------------------------------------------------
 void MainWindowPrivate::clearSettings()
 {
-	QSettings settings(APPINFO::organization, APPINFO::name);
-	settings.clear();
+    QDir settingsDir(settingsPath());
+    if (settingsDir.exists())
+    {
+        settingsDir.removeRecursively();
+    }
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -1083,7 +1230,7 @@ void MainWindowPrivate::createTestMenu()
 
 	testMenu = new QMenu("Test", q);
 
-        selectRunEnvAction = new QAction(QIcon(":/images/green"), "Select RunEnv...", q);
+        addRunEnvAction = new QAction(QIcon(":/images/green"), "Add RunEnv...", q);
 	selectAndRemoveTestAction = new QAction(q->style()->standardIcon(QStyle::SP_TrashIcon), "Remove Test...", testMenu);
 	selectAndRunTest = new QAction(q->style()->standardIcon(QStyle::SP_BrowserReload), "Run Test...", testMenu);
 	selectAndRunTest->setShortcut(QKeySequence(Qt::Key_F5));
@@ -1094,7 +1241,7 @@ void MainWindowPrivate::createTestMenu()
         selectAndKillAllTest_ = new QAction(q->style()->standardIcon(QStyle::SP_DialogCloseButton), "Kill All Test...", testMenu);
         selectAndKillAllTest_->setShortcut(QKeySequence(Qt::SHIFT + Qt::Key_F6));
 
-        testMenu->addAction(selectRunEnvAction);
+        testMenu->addAction(addRunEnvAction);
 	testMenu->addAction(selectAndRemoveTestAction);
 	testMenu->addSeparator();
 	testMenu->addAction(selectAndRunTest);
@@ -1104,7 +1251,7 @@ void MainWindowPrivate::createTestMenu()
 
 	q->menuBar()->addMenu(testMenu);
 
-        connect(selectRunEnvAction, &QAction::triggered, [this]()
+        connect(addRunEnvAction, &QAction::triggered, [this]()
 	{
 		QString filter;
 #ifdef Q_OS_WIN32
@@ -1113,7 +1260,7 @@ void MainWindowPrivate::createTestMenu()
                 // TODO: extend filter?
 		filter = "RunEnv (*.sh)";
 #endif
-                QString filename = QFileDialog::getOpenFileName(q_ptr, "Select RunEnv.bat/sh", runEnvPath_, filter);
+                QString filename = QFileDialog::getOpenFileName(q_ptr, "Select RunEnv.bat/sh", currentRunEnvPath_, filter);
 
                 if (filename.isEmpty())
                 {
@@ -1122,8 +1269,25 @@ void MainWindowPrivate::createTestMenu()
 		else
 		{
                     QFileInfo info(filename);
-                    runEnvPath_ = info.absoluteFilePath();
+                    QString runEnvPath = info.absoluteFilePath();
+                    auto alreadyIndex = runEnvComboBox_->findText(runEnvPath);
+                    if (alreadyIndex != -1)
+                    {
+                        runEnvComboBox_->setCurrentIndex(alreadyIndex);
+                        return;
+                    }
+
+                    saveTestSettingsForCurrentRunEnv();
+                    removeAllTest(true);
+                    currentRunEnvPath_ = runEnvPath;
                     updateTestExecutables();
+
+                    if (runEnvModel_->insertRow(runEnvModel_->rowCount()))
+                    {
+                        auto index = runEnvModel_->index(runEnvModel_->rowCount() - 1, 0);
+                        runEnvModel_->setData(index, runEnvPath);
+                    }
+                    runEnvComboBox_->setCurrentIndex(runEnvComboBox_->count() - 1);
 		}
 	});
 
@@ -1170,22 +1334,46 @@ void MainWindowPrivate::createTestMenu()
         });
 }
 
+void MainWindowPrivate::createToolBar()
+{
+    toolBar_->setObjectName("toolbar");
+    toolBar_->addWidget(runEnvComboBox_);
+
+    runEnvComboBox_->setSizeAdjustPolicy(QComboBox::AdjustToContents);
+    runEnvComboBox_->setModel(runEnvModel_);
+    connect(runEnvComboBox_, &QComboBox::currentTextChanged, [this]
+            (const QString& selectedRunEnv)
+    {
+        // only reload if changed and had one selected before
+        if (currentRunEnvPath_ != selectedRunEnv && !currentRunEnvPath_.isEmpty() && !selectedRunEnv.isEmpty())
+        {
+            saveTestSettingsForCurrentRunEnv();
+            removeAllTest(true);
+            currentRunEnvPath_ = selectedRunEnv;
+            loadTestSettingsForCurrentRunEnv();
+        }
+    });
+}
+
 void MainWindowPrivate::updateTestExecutables()
 {
     static QStringList testDriverFilter = { "TestDriver.py" };
 
-    if (runEnvPath_.isEmpty())
+    if (currentRunEnvPath_.isEmpty())
     {
         return;
     }
 
     QDir homeBase;
 #ifdef Q_OS_WIN32
-    homeBase = QFileInfo(runEnvPath_).dir();
+    homeBase = QFileInfo(currentRunEnvPath_).dir();
 #else
     // TODO: make for env.sh
     return;
 #endif
+
+    // Temporally disable until test executables are added
+    runEnvComboBox_->setEnabled(false);
 
     // TODO delete old exes
 
@@ -1214,6 +1402,8 @@ void MainWindowPrivate::updateTestExecutables()
             testProcess.kill();
         }
     }
+
+    runEnvComboBox_->setEnabled(true);
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -1360,4 +1550,15 @@ void MainWindowPrivate::scrollToConsoleCursor()
 	int cursorY = consoleTextEdit->cursorRect().top();
     QScrollBar *vbar = consoleTextEdit->verticalScrollBar();
     vbar->setValue(vbar->value() + cursorY - 0);
+}
+
+
+QString MainWindowPrivate::settingsPath() const
+{
+    return QStandardPaths::standardLocations(QStandardPaths::AppConfigLocation).first() + "/" + "settings";
+}
+
+QString MainWindowPrivate::dataPath() const
+{
+    return QStandardPaths::standardLocations(QStandardPaths::AppConfigLocation).first() + "/" + "data";
 }

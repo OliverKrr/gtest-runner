@@ -6,7 +6,7 @@
 #include <QtGui>
 #include <QTextEdit>
 #include <QRegExp>
-#include <QSettings>
+#include <QJsonObject>
 
 #include "findreplaceform.h"
 #include "ui_findreplaceform.h"
@@ -197,26 +197,25 @@ void FindReplaceForm::replaceAll() {
     showMessage(tr("Replaced %1 occurrence(s)").arg(i));
 }
 
-void FindReplaceForm::writeSettings(QSettings &settings, const QString &prefix) {
-    settings.beginGroup(prefix);
-    settings.setValue(TEXT_TO_FIND, ui->textToFind->text());
-    settings.setValue(TEXT_TO_REPLACE, ui->textToReplace->text());
-    settings.setValue(DOWN_RADIO, ui->downRadioButton->isChecked());
-    settings.setValue(UP_RADIO, ui->upRadioButton->isChecked());
-    settings.setValue(CASE_CHECK, ui->caseCheckBox->isChecked());
-    settings.setValue(WHOLE_CHECK, ui->wholeCheckBox->isChecked());
-    settings.setValue(REGEXP_CHECK, ui->regexCheckBox->isChecked());
-    settings.endGroup();
+void FindReplaceForm::writeSettings(QJsonObject &settings, const QString &prefix) {
+    QJsonObject obj;
+    obj.insert(TEXT_TO_FIND, ui->textToFind->text());
+    obj.insert(TEXT_TO_REPLACE, ui->textToReplace->text());
+    obj.insert(DOWN_RADIO, ui->downRadioButton->isChecked());
+    obj.insert(UP_RADIO, ui->upRadioButton->isChecked());
+    obj.insert(CASE_CHECK, ui->caseCheckBox->isChecked());
+    obj.insert(WHOLE_CHECK, ui->wholeCheckBox->isChecked());
+    obj.insert(REGEXP_CHECK, ui->regexCheckBox->isChecked());
+    settings.insert(prefix, obj);
 }
 
-void FindReplaceForm::readSettings(QSettings &settings, const QString &prefix) {
-    settings.beginGroup(prefix);
-    ui->textToFind->setText(settings.value(TEXT_TO_FIND, "").toString());
-    ui->textToReplace->setText(settings.value(TEXT_TO_REPLACE, "").toString());
-    ui->downRadioButton->setChecked(settings.value(DOWN_RADIO, false).toBool());
-    ui->upRadioButton->setChecked(settings.value(UP_RADIO, true).toBool());
-    ui->caseCheckBox->setChecked(settings.value(CASE_CHECK, false).toBool());
-    ui->wholeCheckBox->setChecked(settings.value(WHOLE_CHECK, false).toBool());
-    ui->regexCheckBox->setChecked(settings.value(REGEXP_CHECK, false).toBool());
-    settings.endGroup();
+void FindReplaceForm::readSettings(QJsonObject &settings, const QString &prefix) {
+    QJsonObject obj = settings[prefix].toObject();
+    ui->textToFind->setText(obj[TEXT_TO_FIND].toString());
+    ui->textToReplace->setText(obj[TEXT_TO_REPLACE].toString());
+    ui->downRadioButton->setChecked(obj[DOWN_RADIO].toBool());
+    ui->upRadioButton->setChecked(obj[UP_RADIO].toBool());
+    ui->caseCheckBox->setChecked(obj[CASE_CHECK].toBool());
+    ui->wholeCheckBox->setChecked(obj[WHOLE_CHECK].toBool());
+    ui->regexCheckBox->setChecked(obj[REGEXP_CHECK].toBool());
 }

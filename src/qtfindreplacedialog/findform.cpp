@@ -33,11 +33,11 @@ void FindForm::changeEvent(QEvent *e)
     }
 }
 
-void FindForm::writeSettings(QSettings &settings, const QString &prefix) {
+void FindForm::writeSettings(QJsonObject &settings, const QString &prefix) {
     FindReplaceForm::writeSettings(settings, prefix);
 }
 
-void FindForm::readSettings(QSettings &settings, const QString &prefix) {
+void FindForm::readSettings(QJsonObject &settings, const QString &prefix) {
     FindReplaceForm::readSettings(settings, prefix);
 }
 

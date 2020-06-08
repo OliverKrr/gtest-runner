@@ -14,6 +14,7 @@ MainWindow::MainWindow(QStringList tests, bool reset) : QMainWindow(), d_ptr(new
 {
 	Q_D(MainWindow);
 
+        this->addToolBar(d->toolBar_);
 	this->setStatusBar(d->statusBar);
 
 	this->setCentralWidget(d->centralFrame);

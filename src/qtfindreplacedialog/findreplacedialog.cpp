@@ -34,11 +34,11 @@ void FindReplaceDialog::setTextEdit(QTextEdit *textEdit) {
     ui->findReplaceForm->setTextEdit(textEdit);
 }
 
-void FindReplaceDialog::writeSettings(QSettings &settings, const QString &prefix) {
+void FindReplaceDialog::writeSettings(QJsonObject &settings, const QString &prefix) {
     ui->findReplaceForm->writeSettings(settings, prefix);
 }
 
-void FindReplaceDialog::readSettings(QSettings &settings, const QString &prefix) {
+void FindReplaceDialog::readSettings(QJsonObject &settings, const QString &prefix) {
     ui->findReplaceForm->readSettings(settings, prefix);
 }
 
