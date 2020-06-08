@@ -1232,6 +1232,7 @@ void MainWindowPrivate::createTestMenu()
 
         addRunEnvAction = new QAction(QIcon(":/images/green"), "Add RunEnv...", q);
 	selectAndRemoveTestAction = new QAction(q->style()->standardIcon(QStyle::SP_TrashIcon), "Remove Test...", testMenu);
+        removeAllTestAction_ = new QAction(q->style()->standardIcon(QStyle::SP_TrashIcon), "Remove All Test...", testMenu);
 	selectAndRunTest = new QAction(q->style()->standardIcon(QStyle::SP_BrowserReload), "Run Test...", testMenu);
 	selectAndRunTest->setShortcut(QKeySequence(Qt::Key_F5));
 	selectAndRunAllTest = new QAction(q->style()->standardIcon(QStyle::SP_BrowserReload), "Run All Test...", testMenu);
@@ -1243,6 +1244,7 @@ void MainWindowPrivate::createTestMenu()
 
         testMenu->addAction(addRunEnvAction);
 	testMenu->addAction(selectAndRemoveTestAction);
+        testMenu->addAction(removeAllTestAction_);
 	testMenu->addSeparator();
 	testMenu->addAction(selectAndRunTest);
 	testMenu->addAction(selectAndRunAllTest);
@@ -1295,6 +1297,11 @@ void MainWindowPrivate::createTestMenu()
 	{
 		removeTest(getTestIndexDialog("Select test to remove:"));
 	});
+
+        connect(removeAllTestAction_, &QAction::triggered, [this]
+        {
+            removeAllTest();
+        });
 
 	connect(selectAndRunTest, &QAction::triggered, [this]
 	{
@@ -1374,8 +1381,6 @@ void MainWindowPrivate::updateTestExecutables()
 
     // Temporally disable until test executables are added
     runEnvComboBox_->setEnabled(false);
-
-    // TODO delete old exes
 
     homeBase.setNameFilters(testDriverFilter);
     QDirIterator it(homeBase, QDirIterator::Subdirectories);

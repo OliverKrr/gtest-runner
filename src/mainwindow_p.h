@@ -149,6 +149,8 @@ public:
 	QAction*								killTestAction;							///< Kills a running test
 	QAction*								runTestAction;							///< Manually forces a test-run.
 	QAction*								removeTestAction;						///< Removes a test from being watched.
+        // Remove all tests
+        QAction* removeAllTestAction_;
 	
 	QMenu*									optionsMenu;							///< Menu to set system options
         // Enable synchronous test execution
