@@ -147,6 +147,8 @@ public:
 	// Menus
 	QMenu*									executableContextMenu;					///< context menu for the executable list view.
 	QAction*								killTestAction;							///< Kills a running test
+        // Reveal Test Results in Explorer
+        QAction* revealExplorerTestAction_;
 	QAction*								runTestAction;							///< Manually forces a test-run.
 	QAction*								removeTestAction;						///< Removes a test from being watched.
         // Remove all tests
@@ -191,6 +193,8 @@ public:
 	QHash<QString, bool>					executableCheckedStateHash;				///< Hash of the previous state of the checkboxes.
 	QHash<QString, QDomDocument>			testResultsHash;						///< Hash table storing the xml test results for each test path.
 	std::map<QString, std::atomic<bool>>	testRunningHash;						///< Stores whether the given test is actively running.
+        // Mapping test to latest test result dir
+        std::map<QString, QString> testLatestTestRun_;
 
 	// synchronization
 	std::mutex								threadKillMutex;						
@@ -213,6 +217,7 @@ public:
 	explicit MainWindowPrivate(QStringList tests, bool reset, MainWindow* q);
 
 	QString xmlPath(const QString& testPath) const;
+        QString latestGtestResultPath(const QString& testPath);
         void addTestExecutable(const QString& path, const QString& testDriver, bool autorun, QDateTime lastModified, QString filter = "", int repeat = 0, Qt::CheckState runDisabled = Qt::Unchecked, Qt::CheckState shuffle = Qt::Unchecked, int randomSeed = 0, QString otherArgs = "");
 	void runTestInThread(const QString& pathToTest, bool notify);
 	bool loadTestResults(const QString& testPath, bool notify);

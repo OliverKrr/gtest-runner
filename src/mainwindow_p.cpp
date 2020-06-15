@@ -20,6 +20,12 @@
 #include <QJsonObject>
 #include <QJsonArray>
 
+
+namespace
+{
+static const QString GTEST_RESULT_NAME = "gtest-runner_result.xml";
+}
+
 //--------------------------------------------------------------------------------------------------
 //	FUNCTION: MainWindowPrivate
 //--------------------------------------------------------------------------------------------------
@@ -235,10 +241,10 @@ MainWindowPrivate::MainWindowPrivate(QStringList tests, bool reset, MainWindow* 
 		// the data has gotten out of date since the checkbox was off.
 		if (topLeft.data(QExecutableModel::AutorunRole).toBool() && !prevState)
 		{
-			QFileInfo xml(xmlPath(path));
+			QFileInfo gtestResult(latestGtestResultPath(path));
 			QFileInfo exe(path);
 
-			if (xml.lastModified() < exe.lastModified())
+                        if (gtestResult.lastModified() < exe.lastModified())
 			{
 				// out of date! re-run.
 				emit showMessage("Automatic testing enabled for: " + topLeft.data(Qt::DisplayRole).toString() + ". Re-running tests...");
@@ -418,9 +424,24 @@ MainWindowPrivate::MainWindowPrivate(QStringList tests, bool reset, MainWindow* 
 //--------------------------------------------------------------------------------------------------
 QString MainWindowPrivate::xmlPath(const QString& testPath) const
 {
-	QFileInfo testInfo(testPath);
-	QString hash = QCryptographicHash::hash(testPath.toLatin1(), QCryptographicHash::Md5).toHex();
-        return dataPath() + "/" + hash + ".xml";
+    QString name = executableModel->index(testPath).data(QExecutableModel::NameRole).toString();
+    QString hash = QCryptographicHash::hash(testPath.toLatin1(), QCryptographicHash::Md5).toHex();
+    return dataPath() + "/" + name + "_" + hash;
+}
+
+QString MainWindowPrivate::latestGtestResultPath(const QString& testPath)
+{
+    const QString basicPath = xmlPath(testPath);
+    if (testLatestTestRun_.find(testPath) == testLatestTestRun_.end())
+    {
+        const QStringList results = QDir(basicPath).entryList(QDir::Dirs, QDir::Name | QDir::Reversed);
+        if (results.isEmpty())
+        {
+            return QString();
+        }
+        testLatestTestRun_[testPath] = results[0];
+    }
+    return basicPath + "/" + testLatestTestRun_[testPath] + "/" + GTEST_RESULT_NAME;
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -445,8 +466,6 @@ void MainWindowPrivate::addTestExecutable(const QString& path, const QString& te
 		lastModified = fileinfo.lastModified();
 
 	executableCheckedStateHash[path] = autorun;
-
-	QFileInfo xmlResults(xmlPath(path));
 	
 	QModelIndex newRow = executableModel->insertRow(QModelIndex(), path);
 
@@ -585,15 +604,25 @@ void MainWindowPrivate::runTestInThread(const QString& pathToTest, bool notify)
                 }
 
 
+                QString currentDate = QDateTime::currentDateTime().toString("yyyy.MM.dd_hh.mm.ss.zzz");
+                QString copyResultDir = xmlPath(pathToTest) + "/" + currentDate;
+                QDir(copyResultDir).mkpath(".");
+                testLatestTestRun_[pathToTest] = currentDate;
+
+
 		// SET GTEST ARGS
 		QModelIndex index = executableModel->index(pathToTest);
                 QString testDriver = executableModel->data(index, QExecutableModel::TestDriverRole).toString();
+                QString testDriverDir = QFileInfo(testDriver).dir().path();
 
                 QStringList arguments(testDriver);
 
-                arguments << "--build-config " + info.dir().dirName();
+                arguments << "-C";
+                arguments << info.dir().dirName();
+                arguments << "--output-dir";
+                arguments << copyResultDir;
 
-                arguments << "--gtest_output=xml:\"" + this->xmlPath(pathToTest) + "\"";
+                arguments << "--gtest_output=xml:\"" + testDriverDir + "/" + GTEST_RESULT_NAME + "\"";
 
 		QString filter = executableModel->data(index, QExecutableModel::FilterRole).toString();
 		if (!filter.isEmpty()) arguments << "--gtest_filter=" + filter;
@@ -617,7 +646,7 @@ void MainWindowPrivate::runTestInThread(const QString& pathToTest, bool notify)
 
 		// Set working directory to be the same as the executable
 		// (common standard for tests to find test-data files)
-                testProcess.setWorkingDirectory(QFileInfo(testDriver).dir().path());
+                testProcess.setWorkingDirectory(testDriverDir);
 
                 QString cmd = "\"" + currentRunEnvPath_ + "\" && py";
 
@@ -682,7 +711,7 @@ void MainWindowPrivate::runTestInThread(const QString& pathToTest, bool notify)
 //--------------------------------------------------------------------------------------------------
 bool MainWindowPrivate::loadTestResults(const QString& testPath, bool notify)
 {
-	QFileInfo xmlInfo(xmlPath(testPath));
+	QFileInfo xmlInfo(latestGtestResultPath(testPath));
 
 	if (!xmlInfo.exists())
 	{
@@ -1111,10 +1140,12 @@ void MainWindowPrivate::createExecutableContextMenu()
 
 	runTestAction = new QAction(q->style()->standardIcon(QStyle::SP_BrowserReload), "Run Test...", executableContextMenu);
 	killTestAction = new QAction(q->style()->standardIcon(QStyle::SP_DialogCloseButton), "Kill Test...", executableContextMenu);
+        revealExplorerTestAction_ = new QAction(q->style()->standardIcon(QStyle::SP_DirOpenIcon), "Reveal Test Results...", executableContextMenu);
 	removeTestAction = new QAction(q->style()->standardIcon(QStyle::SP_TrashIcon), "Remove Test", executableContextMenu);
 
 	executableContextMenu->addAction(runTestAction);
 	executableContextMenu->addAction(killTestAction);
+        executableContextMenu->addAction(revealExplorerTestAction_);
 	executableContextMenu->addSeparator();	
 	executableContextMenu->addAction(removeTestAction);
 	executableContextMenu->addAction(selectAndRemoveTestAction);
@@ -1132,12 +1163,14 @@ void MainWindowPrivate::createExecutableContextMenu()
 			else
 				killTestAction->setEnabled(false);
 			removeTestAction->setVisible(true);
+                        revealExplorerTestAction_->setEnabled(QDir(xmlPath(index.data(QExecutableModel::PathRole).toString())).exists());
 			selectAndRemoveTestAction->setVisible(false);
 		}
 		else
 		{
 			runTestAction->setEnabled(false);
 			killTestAction->setEnabled(false);
+                        revealExplorerTestAction_->setEnabled(false);
 			removeTestAction->setVisible(false);
 			selectAndRemoveTestAction->setVisible(true);
 		}
@@ -1160,6 +1193,12 @@ void MainWindowPrivate::createExecutableContextMenu()
 		if (QMessageBox::question(q, "Kill Test?", "Are you sure you want to kill test: " + name + "?", QMessageBox::Yes, QMessageBox::No) == QMessageBox::Yes)
 			emit killTest(path);
 	});
+
+        connect(revealExplorerTestAction_, &QAction::triggered, [this]
+        {
+            QString path = executableTreeView->currentIndex().data(QExecutableModel::PathRole).toString();
+            QDesktopServices::openUrl(QUrl::fromLocalFile(xmlPath(path)));
+        });
 
 	connect(removeTestAction, &QAction::triggered, [this]
 	{
@@ -1420,7 +1459,7 @@ void MainWindowPrivate::createOptionsMenu()
 
 	optionsMenu = new QMenu("Options", q);
 
-        runTestsSynchronousAction_ = new QAction("Run tests synchronous and not in parallel", optionsMenu);
+        runTestsSynchronousAction_ = new QAction("Run tests synchronous and not parallel", optionsMenu);
 	notifyOnFailureAction = new QAction("Notify on auto-run Failure", optionsMenu);
 	notifyOnSuccessAction = new QAction("Notify on auto-run Success", optionsMenu);
         runTestsSynchronousAction_->setCheckable(true);
