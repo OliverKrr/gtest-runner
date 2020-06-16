@@ -666,6 +666,11 @@ void MainWindowPrivate::runTestInThread(const QString& pathToTest, bool notify)
                 arguments << "--output-dir";
                 arguments << copyResultDir;
 
+                if (pipeAllTestOutput_->isChecked())
+                {
+                    arguments << "--pipe-log";
+                }
+
                 arguments << "--gtest_output=xml:\"" + testDriverDir + "/" + GTEST_RESULT_NAME + "\"";
 
 		QString filter = executableModel->data(index, QExecutableModel::FilterRole).toString();
@@ -897,6 +902,7 @@ void MainWindowPrivate::saveCommonSettings(const QString& path) const
 
     QJsonObject options;
     options.insert("runTestsSynchronous", runTestsSynchronousAction_->isChecked());
+    options.insert("pipeAllTestOutput", pipeAllTestOutput_->isChecked());
     options.insert("notifyOnFailure", notifyOnFailureAction->isChecked());
     options.insert("notifyOnSuccess", notifyOnSuccessAction->isChecked());
     options.insert("theme", themeActionGroup->checkedAction()->objectName());
@@ -1005,6 +1011,7 @@ void MainWindowPrivate::loadCommonSettings(const QString& path)
 
     QJsonObject options = root["options"].toObject();
     runTestsSynchronousAction_->setChecked(options["runTestsSynchronous"].toBool());
+    pipeAllTestOutput_->setChecked(options["pipeAllTestOutput"].toBool());
     notifyOnFailureAction->setChecked(options["notifyOnFailure"].toBool());
     notifyOnSuccessAction->setChecked(options["notifyOnSuccess"].toBool());
     themeMenu->findChild<QAction*>(options["theme"].toString())->trigger();
@@ -1534,16 +1541,20 @@ void MainWindowPrivate::createOptionsMenu()
 	optionsMenu = new QMenu("Options", q);
 
         runTestsSynchronousAction_ = new QAction("Run tests synchronous and not parallel", optionsMenu);
+        pipeAllTestOutput_ = new QAction("Pipe all test output to Console Output", optionsMenu);
 	notifyOnFailureAction = new QAction("Notify on auto-run Failure", optionsMenu);
 	notifyOnSuccessAction = new QAction("Notify on auto-run Success", optionsMenu);
         runTestsSynchronousAction_->setCheckable(true);
         runTestsSynchronousAction_->setChecked(false);
+        pipeAllTestOutput_->setCheckable(true);
+        pipeAllTestOutput_->setChecked(false);
 	notifyOnFailureAction->setCheckable(true);
 	notifyOnFailureAction->setChecked(true);
 	notifyOnSuccessAction->setCheckable(true);
 	notifyOnSuccessAction->setChecked(false);
 
         optionsMenu->addAction(runTestsSynchronousAction_);
+        optionsMenu->addAction(pipeAllTestOutput_);
 	optionsMenu->addAction(notifyOnFailureAction);
 	optionsMenu->addAction(notifyOnSuccessAction);
 

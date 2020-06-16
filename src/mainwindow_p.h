@@ -159,6 +159,8 @@ public:
 	QMenu*									optionsMenu;							///< Menu to set system options
         // Enable synchronous test execution
         QAction* runTestsSynchronousAction_;
+        // Enable to pipe all test output to console
+        QAction* pipeAllTestOutput_;
 	QAction*								notifyOnFailureAction;					///< Enable failure notifications
 	QAction*								notifyOnSuccessAction;					///< Enable success notifications
 
