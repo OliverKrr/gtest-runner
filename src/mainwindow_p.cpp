@@ -25,6 +25,7 @@
 namespace
 {
 static const QString GTEST_RESULT_NAME = "gtest-runner_result.xml";
+static const QString DATE_FORMAT = "yyyy.MM.dd_hh.mm.ss.zzz";
 static const int MAX_PARALLEL_TEST_EXEC = QThreadPool::globalInstance()->maxThreadCount();
 }
 
@@ -222,8 +223,6 @@ MainWindowPrivate::MainWindowPrivate(QStringList tests, bool reset, MainWindow* 
 			// only auto-run if the test is checked
 			if (m.data(QExecutableModel::AutorunRole).toBool())
 			{
-				executableModel->setData(m, QDateTime::currentDateTime(), QExecutableModel::LastModifiedRole);
-
 				emit showMessage("Change detected: " + path + "...");
 				// add a little delay to avoid running multiple instances of the same test build,
 				// and to avoid running the file before visual studio is done writting it.
@@ -531,8 +530,6 @@ void MainWindowPrivate::addTestExecutable(const QString& path, const QString& te
 	if ((!previousResults || outOfDate) && autorun)
 	{
 		this->runTestInThread(path, false);
-		QFileInfo newInfo(path);
-		executableModel->setData(newRow, newInfo.lastModified(), QExecutableModel::LastModifiedRole);
 	}
 	else if (outOfDate && !autorun)
 	{
@@ -563,6 +560,7 @@ void MainWindowPrivate::runTestInThread(const QString& pathToTest, bool notify)
 		executableModel->setData(executableModel->index(pathToTest), ExecutableData::RUNNING, QExecutableModel::StateRole);
 		
 		QFileInfo info(pathToTest);
+                executableModel->setData(executableModel->index(pathToTest), info.lastModified(), QExecutableModel::LastModifiedRole);
                 QString testName = executableModel->index(pathToTest).data(QExecutableModel::NameRole).toString();
 		QProcess testProcess;
 
@@ -649,7 +647,7 @@ void MainWindowPrivate::runTestInThread(const QString& pathToTest, bool notify)
                 }
 
 
-                QString currentDate = QDateTime::currentDateTime().toString("yyyy.MM.dd_hh.mm.ss.zzz");
+                QString currentDate = QDateTime::currentDateTime().toString(DATE_FORMAT);
                 QString copyResultDir = xmlPath(pathToTest, true) + "/" + currentDate;
                 testLatestTestRun_[pathToTest] = currentDate;
 
@@ -944,7 +942,7 @@ void MainWindowPrivate::saveTestSettings(const QString& path) const
         test.insert("path", QJsonValue::fromVariant(index.data(QExecutableModel::PathRole)));
         test.insert("testDriver", QJsonValue::fromVariant(index.data(QExecutableModel::TestDriverRole)));
         test.insert("autorun", QJsonValue::fromVariant(index.data(QExecutableModel::AutorunRole)));
-        test.insert("lastModified", index.data(QExecutableModel::LastModifiedRole).toDateTime().toString(Qt::DateFormat::ISODate));
+        test.insert("lastModified", index.data(QExecutableModel::LastModifiedRole).toDateTime().toString(DATE_FORMAT));
         test.insert("filter", QJsonValue::fromVariant(index.data(QExecutableModel::FilterRole)));
         test.insert("repeat", QJsonValue::fromVariant(index.data(QExecutableModel::RepeatTestsRole)));
         test.insert("runDisabled", QJsonValue::fromVariant(index.data(QExecutableModel::RunDisabledTestsRole)));
@@ -1049,7 +1047,7 @@ void MainWindowPrivate::loadTestSettings(const QString& path)
         QString path = test["path"].toString();
         QString testDriver = test["testDriver"].toString();
         bool autorun = test["autorun"].toBool();
-        QDateTime lastModified = QDateTime::fromString(test["lastModified"].toString(), Qt::DateFormat::ISODate);
+        QDateTime lastModified = QDateTime::fromString(test["lastModified"].toString(), DATE_FORMAT);
         QString filter = test["filter"].toString();
         int repeat = test["repeat"].toInt();
         Qt::CheckState runDisabled = static_cast<Qt::CheckState>(test["runDisabled"].toInt());
