@@ -229,6 +229,7 @@ public:
 	void loadSettings();
         void removeAllTest(const bool confirm = false);
 	void removeTest(const QModelIndex &index, const bool confirm = false);
+        void killAllTestAndWait();
 	void clearData();
 	void clearSettings();
         void updateTestExecutables();
@@ -252,6 +253,7 @@ protected:
 
         ///< kills the test if it's currently running
         void emitKillTest(const QString& path);
+        void killAllTest(const bool confirm = false);
 
         void saveCommonSettings(const QString& path) const;
         void saveTestSettingsForCurrentRunEnv() const;

@@ -1400,26 +1400,54 @@ void MainWindowPrivate::createTestMenu()
 		}
 	});
 
-	connect(selectAndKillTest, &QAction::triggered, [this, q]
+	connect(selectAndKillTest, &QAction::triggered, [this]
 	{
 		QModelIndex index = getTestIndexDialog("Select Test to kill:", true);
 		QString name = index.data(QExecutableModel::NameRole).toString();
 		if (index.isValid())
-			if (QMessageBox::question(q, "Kill Test?", "Are you sure you want to kill test: " + name + "?", QMessageBox::Yes, QMessageBox::No) == QMessageBox::Yes)
+			if (QMessageBox::question(this->q_ptr, "Kill Test?", "Are you sure you want to kill test: " + name + "?", QMessageBox::Yes, QMessageBox::No) == QMessageBox::Yes)
 				emitKillTest(index.data(QExecutableModel::PathRole).toString());
 	});
 
-        connect(selectAndKillAllTest_, &QAction::triggered, [this, q]
+        connect(selectAndKillAllTest_, &QAction::triggered, [this]
         {
-            if (QMessageBox::question(q, "Kill All Test?", "Are you sure you want to kill all test?", QMessageBox::Yes, QMessageBox::No) == QMessageBox::Yes)
-            {
-                for (size_t i = 0; i < executableTreeView->model()->rowCount(); ++i)
-                {
-                    QModelIndex index = executableTreeView->model()->index(i, 0);
-                    emitKillTest(index.data(QExecutableModel::PathRole).toString());
-                }
-            }
+            killAllTest();
         });
+}
+
+void MainWindowPrivate::killAllTest(const bool confirm)
+{
+    if (confirm || QMessageBox::question(this->q_ptr, "Kill All Test?", "Are you sure you want to kill all test?", QMessageBox::Yes, QMessageBox::No) == QMessageBox::Yes)
+    {
+        for (size_t i = 0; i < executableTreeView->model()->rowCount(); ++i)
+        {
+            QModelIndex index = executableTreeView->model()->index(i, 0);
+            emitKillTest(index.data(QExecutableModel::PathRole).toString());
+        }
+    }
+}
+
+void MainWindowPrivate::killAllTestAndWait()
+{
+    killAllTest(true);
+    // Busy waiting till all threads are terminated
+    bool isFinished = false;
+    while (!isFinished)
+    {
+        isFinished = true;
+        for (const auto& entry : testRunningHash)
+        {
+            if (entry.second.load())
+            {
+                isFinished = false;
+                break;
+            }
+        }
+        if (!isFinished)
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+    }
 }
 
 void MainWindowPrivate::createToolBar()

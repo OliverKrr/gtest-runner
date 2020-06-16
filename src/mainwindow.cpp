@@ -62,6 +62,7 @@ MainWindow::~MainWindow()
 void MainWindow::closeEvent(QCloseEvent* event)
 {
 	Q_D(MainWindow);
+        d->killAllTestAndWait();
 	d->saveSettings();
 	QMainWindow::closeEvent(event);
 }
