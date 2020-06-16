@@ -446,11 +446,16 @@ MainWindowPrivate::MainWindowPrivate(QStringList tests, bool reset, MainWindow* 
 //--------------------------------------------------------------------------------------------------
 //	FUNCTION: xmlPath
 //--------------------------------------------------------------------------------------------------
-QString MainWindowPrivate::xmlPath(const QString& testPath) const
+QString MainWindowPrivate::xmlPath(const QString& testPath, const bool create) const
 {
     QString name = executableModel->index(testPath).data(QExecutableModel::NameRole).toString();
     QString hash = QCryptographicHash::hash(testPath.toLatin1(), QCryptographicHash::Md5).toHex();
-    return dataPath() + "/" + name + "_" + hash;
+    QString path = dataPath() + "/" + name + "_" + hash;
+    if (create)
+    {
+        QDir(path).mkpath(".");
+    }
+    return path;
 }
 
 QString MainWindowPrivate::latestGtestResultPath(const QString& testPath)
@@ -645,8 +650,7 @@ void MainWindowPrivate::runTestInThread(const QString& pathToTest, bool notify)
 
 
                 QString currentDate = QDateTime::currentDateTime().toString("yyyy.MM.dd_hh.mm.ss.zzz");
-                QString copyResultDir = xmlPath(pathToTest) + "/" + currentDate;
-                QDir(copyResultDir).mkpath(".");
+                QString copyResultDir = xmlPath(pathToTest, true) + "/" + currentDate;
                 testLatestTestRun_[pathToTest] = currentDate;
 
 
@@ -760,7 +764,7 @@ bool MainWindowPrivate::loadTestResults(const QString& testPath, bool notify)
 	QFile file(xmlInfo.absoluteFilePath());
 	if (!file.open(QIODevice::ReadOnly))
 	{
-		QMessageBox::warning(q_ptr, "Error", "Could not open file located at: " + xmlPath(testPath));
+                QMessageBox::warning(q_ptr, "Error", "Could not open file located at: " + xmlInfo.absoluteFilePath());
 		return false;
 	}
 	if (!doc.setContent(&file))
@@ -1459,6 +1463,9 @@ void MainWindowPrivate::updateTestExecutables()
 
     // Temporally disable until test executables are added
     runEnvComboBox_->setEnabled(false);
+
+    // Remove all old and add again
+    removeAllTest(true);
 
     homeBase.setNameFilters(testDriverFilter);
     QDirIterator it(homeBase, QDirIterator::Subdirectories);
