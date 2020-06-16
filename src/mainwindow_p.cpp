@@ -20,6 +20,7 @@
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QThreadPool>
+#include <QLabel>
 
 
 namespace
@@ -171,10 +172,14 @@ MainWindowPrivate::MainWindowPrivate(QStringList tests, bool reset, MainWindow* 
 	consoleTextEdit->setReadOnly(true);
 
 	consoleFindDialog->setTextEdit(consoleTextEdit);
-	
-	systemTrayIcon->show();
 
-	createTestMenu();
+        systemTrayIcon->show();
+
+        toolBar_->setObjectName("toolbar");
+        toolBar_->setWindowTitle("Toolbar");
+        createToolBar();
+
+        createTestMenu();
 	createOptionsMenu();
 	createWindowMenu();
 	createThemeMenu();
@@ -183,8 +188,6 @@ MainWindowPrivate::MainWindowPrivate(QStringList tests, bool reset, MainWindow* 
 	createExecutableContextMenu();
 	createConsoleContextMenu();
 	createTestCaseViewContextMenu();
-
-        createToolBar();
 
 	connect(this, &MainWindowPrivate::setStatus, statusBar, &QStatusBar::setStatusTip, Qt::QueuedConnection);
 	connect(this, &MainWindowPrivate::testResultsReady, this, &MainWindowPrivate::loadTestResults, Qt::QueuedConnection);
@@ -1156,7 +1159,7 @@ void MainWindowPrivate::clearSettings()
 QModelIndex MainWindowPrivate::getTestIndexDialog(const QString& label, bool running /*= false*/)
 {
 	bool ok;
-	QHash<QString, QString> tests;
+        QMap<QString, QString> tests;
 
 	for (auto itr = executableModel->begin(); itr != executableModel->end(); ++itr)
 	{
@@ -1176,6 +1179,247 @@ QModelIndex MainWindowPrivate::getTestIndexDialog(const QString& label, bool run
 		return QModelIndex();
 }
 
+void MainWindowPrivate::createToolBar()
+{
+    Q_Q(MainWindow);
+
+    addRunEnvAction = new QAction(q->style()->standardIcon(QStyle::SP_DialogOpenButton),
+                                  "Add Run Environment", q);
+    addRunEnvAction->setToolTip("Add new Run Environment to automatically find & execute build tests (via buildtest target)");
+    runEnvComboBox_->setSizeAdjustPolicy(QComboBox::AdjustToContents);
+    runEnvComboBox_->setModel(runEnvModel_);
+    runEnvComboBox_->setToolTip("Select current Run Environment. You can start a separate instance of gtest-runner for each environment");
+
+    selectAndRunTest = new QAction(q->style()->standardIcon(QStyle::SP_BrowserReload), "Run Test...", toolBar_);
+    selectAndRunTest->setShortcut(QKeySequence(Qt::Key_F5));
+    selectAndKillTest = new QAction(q->style()->standardIcon(QStyle::SP_BrowserStop), "Kill Test...", toolBar_);
+    selectAndKillTest->setShortcut(QKeySequence(Qt::SHIFT + Qt::Key_F5));
+    selectAndRevealExplorerTestAction_ = new QAction(q->style()->standardIcon(QStyle::SP_DirOpenIcon), "Reveal Test Results...", toolBar_);
+    selectAndRemoveTestAction = new QAction(q->style()->standardIcon(QStyle::SP_TrashIcon), "Remove Test...", toolBar_);
+
+    runAllTestsAction = new QAction(q->style()->standardIcon(QStyle::SP_BrowserReload), "Run All Tests", toolBar_);
+    runAllTestsAction->setShortcut(QKeySequence(Qt::Key_F6));
+    killAllTestsAction_ = new QAction(q->style()->standardIcon(QStyle::SP_BrowserStop), "Kill All Tests", toolBar_);
+    killAllTestsAction_->setShortcut(QKeySequence(Qt::SHIFT + Qt::Key_F6));
+    revealExplorerTestResultAction_ = new QAction(q->style()->standardIcon(QStyle::SP_DirOpenIcon), "Reveal Test Result Dir", toolBar_);
+    removeAllTestsAction_ = new QAction(q->style()->standardIcon(QStyle::SP_TrashIcon), "Remove All Tests", toolBar_);
+
+    toolBar_->addWidget(new QLabel("Env:", toolBar_));
+    toolBar_->addAction(addRunEnvAction);
+    toolBar_->addWidget(runEnvComboBox_);
+    toolBar_->addSeparator();
+    toolBar_->addWidget(new QLabel("One:", toolBar_));
+    toolBar_->addAction(selectAndRunTest);
+    toolBar_->addAction(selectAndKillTest);
+    toolBar_->addAction(selectAndRevealExplorerTestAction_);
+    toolBar_->addAction(selectAndRemoveTestAction);
+    toolBar_->addSeparator();
+    toolBar_->addWidget(new QLabel("All:", toolBar_));
+    toolBar_->addAction(runAllTestsAction);
+    toolBar_->addAction(killAllTestsAction_);
+    toolBar_->addAction(revealExplorerTestResultAction_);
+    toolBar_->addAction(removeAllTestsAction_);
+
+    connect(addRunEnvAction, &QAction::triggered, [this]()
+    {
+        QString filter;
+#ifdef Q_OS_WIN32
+        filter = "RunEnv (RunEnv.bat RunEnv.sh)";
+#else
+        // TODO: extend filter?
+        filter = "RunEnv (*.sh)";
+#endif
+        QString filename = QFileDialog::getOpenFileName(q_ptr, "Select RunEnv.bat/sh", currentRunEnvPath_, filter);
+
+        if (filename.isEmpty())
+        {
+            return;
+        }
+        else
+        {
+            QFileInfo info(filename);
+            QString runEnvPath = info.absoluteFilePath();
+            auto alreadyIndex = runEnvComboBox_->findText(runEnvPath);
+            if (alreadyIndex != -1)
+            {
+                runEnvComboBox_->setCurrentIndex(alreadyIndex);
+                return;
+            }
+
+            saveTestSettingsForCurrentRunEnv();
+            removeAllTest(true);
+            currentRunEnvPath_ = runEnvPath;
+            updateTestExecutables();
+
+            if (runEnvModel_->insertRow(runEnvModel_->rowCount()))
+            {
+                auto index = runEnvModel_->index(runEnvModel_->rowCount() - 1, 0);
+                runEnvModel_->setData(index, runEnvPath);
+            }
+            runEnvComboBox_->setCurrentIndex(runEnvComboBox_->count() - 1);
+        }
+    });
+
+    connect(runEnvComboBox_, &QComboBox::currentTextChanged, [this]
+            (const QString& selectedRunEnv)
+    {
+        // only reload if changed and had one selected before
+        if (currentRunEnvPath_ != selectedRunEnv && !currentRunEnvPath_.isEmpty() && !selectedRunEnv.isEmpty())
+        {
+            saveTestSettingsForCurrentRunEnv();
+            removeAllTest(true);
+            currentRunEnvPath_ = selectedRunEnv;
+            loadTestSettingsForCurrentRunEnv();
+        }
+    });
+
+    connect(selectAndRunTest, &QAction::triggered, [this]
+    {
+        QModelIndex index = getTestIndexDialog("Select Test to run:");
+        if (index.isValid())
+            runTestInThread(index.data(QExecutableModel::PathRole).toString(), false);
+    });
+
+    connect(selectAndKillTest, &QAction::triggered, [this]
+    {
+        QModelIndex index = getTestIndexDialog("Select Test to kill:", true);
+        if (index.isValid())
+        {
+            QString name = index.data(QExecutableModel::NameRole).toString();
+            if (QMessageBox::question(this->q_ptr, "Kill Test?", "Are you sure you want to kill test: " + name + "?", QMessageBox::Yes, QMessageBox::No) == QMessageBox::Yes)
+            {
+                emitKillTest(index.data(QExecutableModel::PathRole).toString());
+            }
+        }
+    });
+
+    connect(selectAndRevealExplorerTestAction_, &QAction::triggered, [this]
+    {
+        QModelIndex index = getTestIndexDialog("Select test to reveal explorer:");
+        if (index.isValid())
+        {
+            QString path = index.data(QExecutableModel::PathRole).toString();
+            QDesktopServices::openUrl(QUrl::fromLocalFile(xmlPath(path)));
+        }
+    });
+
+    connect(selectAndRemoveTestAction, &QAction::triggered, [this]
+    {
+        removeTest(getTestIndexDialog("Select test to remove:"));
+    });
+
+    connect(runAllTestsAction, &QAction::triggered, [this]
+    {
+        for (size_t i = 0; i < executableTreeView->model()->rowCount(); ++i)
+        {
+            QModelIndex index = executableTreeView->model()->index(i, 0);
+            runTestInThread(index.data(QExecutableModel::PathRole).toString(), false);
+        }
+    });
+
+    connect(killAllTestsAction_, &QAction::triggered, [this]
+    {
+        killAllTest();
+    });
+
+    connect(revealExplorerTestResultAction_, &QAction::triggered, [this]
+    {
+        QDesktopServices::openUrl(QUrl::fromLocalFile(dataPath()));
+    });
+
+    connect(removeAllTestsAction_, &QAction::triggered, [this]
+    {
+        removeAllTest();
+    });
+}
+
+void MainWindowPrivate::killAllTest(const bool confirm)
+{
+    if (confirm || QMessageBox::question(this->q_ptr, "Kill All Test?", "Are you sure you want to kill all test?", QMessageBox::Yes, QMessageBox::No) == QMessageBox::Yes)
+    {
+        for (size_t i = 0; i < executableTreeView->model()->rowCount(); ++i)
+        {
+            QModelIndex index = executableTreeView->model()->index(i, 0);
+            emitKillTest(index.data(QExecutableModel::PathRole).toString());
+        }
+    }
+}
+
+void MainWindowPrivate::killAllTestAndWait()
+{
+    killAllTest(true);
+    // Busy waiting till all threads are terminated
+    bool isFinished = false;
+    while (!isFinished)
+    {
+        isFinished = true;
+        for (const auto& entry : testRunningHash)
+        {
+            if (entry.second.load())
+            {
+                isFinished = false;
+                break;
+            }
+        }
+        if (!isFinished)
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+    }
+}
+
+void MainWindowPrivate::updateTestExecutables()
+{
+    static QStringList testDriverFilter = { "TestDriver.py" };
+
+    if (currentRunEnvPath_.isEmpty())
+    {
+        return;
+    }
+
+    QDir homeBase;
+#ifdef Q_OS_WIN32
+    homeBase = QFileInfo(currentRunEnvPath_).dir();
+#else
+    // TODO: make for env.sh
+    return;
+#endif
+
+    // Temporally disable until test executables are added
+    runEnvComboBox_->setEnabled(false);
+
+    // Remove all old and add again
+    removeAllTest(true);
+
+    homeBase.setNameFilters(testDriverFilter);
+    QDirIterator it(homeBase, QDirIterator::Subdirectories);
+    while (it.hasNext())
+    {
+        QFileInfo testDriverFileInfo(it.next());
+
+        // Get test executables with list-test-exess option
+        QProcess testProcess;
+        QStringList arguments(testDriverFileInfo.absoluteFilePath());
+        arguments << "--list-test-exes";
+        testProcess.start("py", arguments);
+
+        if (testProcess.waitForFinished(500))
+        {
+            QString output = testProcess.readAllStandardOutput();
+            for (const auto& testExe : output.split(QRegExp("[\r\n]"), QString::SkipEmptyParts))
+            {
+                addTestExecutable(testExe.trimmed(), testDriverFileInfo.absoluteFilePath(), false, QDateTime());
+            }
+        }
+        else
+        {
+            testProcess.kill();
+        }
+    }
+
+    runEnvComboBox_->setEnabled(true);
+}
+
 //--------------------------------------------------------------------------------------------------
 //	FUNCTION: createExecutableContextMenu
 //--------------------------------------------------------------------------------------------------
@@ -1185,9 +1429,9 @@ void MainWindowPrivate::createExecutableContextMenu()
 
 	executableContextMenu = new QMenu(executableTreeView);
 
-	runTestAction = new QAction(q->style()->standardIcon(QStyle::SP_BrowserReload), "Run Test...", executableContextMenu);
-	killTestAction = new QAction(q->style()->standardIcon(QStyle::SP_DialogCloseButton), "Kill Test...", executableContextMenu);
-        revealExplorerTestAction_ = new QAction(q->style()->standardIcon(QStyle::SP_DirOpenIcon), "Reveal Test Results...", executableContextMenu);
+	runTestAction = new QAction(q->style()->standardIcon(QStyle::SP_BrowserReload), "Run Test", executableContextMenu);
+        killTestAction = new QAction(q->style()->standardIcon(QStyle::SP_BrowserStop), "Kill Test", executableContextMenu);
+        revealExplorerTestAction_ = new QAction(q->style()->standardIcon(QStyle::SP_DirOpenIcon), "Reveal Test Results", executableContextMenu);
 	removeTestAction = new QAction(q->style()->standardIcon(QStyle::SP_TrashIcon), "Remove Test", executableContextMenu);
 
 	executableContextMenu->addAction(runTestAction);
@@ -1195,7 +1439,6 @@ void MainWindowPrivate::createExecutableContextMenu()
         executableContextMenu->addAction(revealExplorerTestAction_);
 	executableContextMenu->addSeparator();	
 	executableContextMenu->addAction(removeTestAction);
-	executableContextMenu->addAction(selectAndRemoveTestAction);
 
 	executableTreeView->setContextMenuPolicy(Qt::CustomContextMenu);
 	
@@ -1209,20 +1452,17 @@ void MainWindowPrivate::createExecutableContextMenu()
 				killTestAction->setEnabled(true);
 			else
 				killTestAction->setEnabled(false);
-			removeTestAction->setVisible(true);
                         revealExplorerTestAction_->setEnabled(QDir(xmlPath(index.data(QExecutableModel::PathRole).toString())).exists());
-			selectAndRemoveTestAction->setVisible(false);
+                        removeTestAction->setEnabled(true);
 		}
 		else
 		{
 			runTestAction->setEnabled(false);
 			killTestAction->setEnabled(false);
                         revealExplorerTestAction_->setEnabled(false);
-			removeTestAction->setVisible(false);
-			selectAndRemoveTestAction->setVisible(true);
+                        removeTestAction->setEnabled(false);
 		}
 		executableContextMenu->exec(executableTreeView->mapToGlobal(pos));
-		selectAndRemoveTestAction->setVisible(true);	// important b/c this is a shared action
 	});
 
 	connect(runTestAction, &QAction::triggered, [this]
@@ -1312,221 +1552,25 @@ void MainWindowPrivate::createConsoleContextMenu()
 //--------------------------------------------------------------------------------------------------
 void MainWindowPrivate::createTestMenu()
 {
-	Q_Q(MainWindow);
+    Q_Q(MainWindow);
 
-	testMenu = new QMenu("Test", q);
+    testMenu = new QMenu("Test", q);
 
-        addRunEnvAction = new QAction(QIcon(":/images/green"), "Add RunEnv...", q);
-	selectAndRemoveTestAction = new QAction(q->style()->standardIcon(QStyle::SP_TrashIcon), "Remove Test...", testMenu);
-        removeAllTestAction_ = new QAction(q->style()->standardIcon(QStyle::SP_TrashIcon), "Remove All Test...", testMenu);
-	selectAndRunTest = new QAction(q->style()->standardIcon(QStyle::SP_BrowserReload), "Run Test...", testMenu);
-	selectAndRunTest->setShortcut(QKeySequence(Qt::Key_F5));
-	selectAndRunAllTest = new QAction(q->style()->standardIcon(QStyle::SP_BrowserReload), "Run All Test...", testMenu);
-	selectAndRunAllTest->setShortcut(QKeySequence(Qt::Key_F6));
-	selectAndKillTest = new QAction(q->style()->standardIcon(QStyle::SP_DialogCloseButton), "Kill Test...", testMenu);
-	selectAndKillTest->setShortcut(QKeySequence(Qt::SHIFT + Qt::Key_F5));
-        selectAndKillAllTest_ = new QAction(q->style()->standardIcon(QStyle::SP_DialogCloseButton), "Kill All Test...", testMenu);
-        selectAndKillAllTest_->setShortcut(QKeySequence(Qt::SHIFT + Qt::Key_F6));
+    // Actions already created by createToolBar() -> mirror functionality
 
-        testMenu->addAction(addRunEnvAction);
-	testMenu->addAction(selectAndRemoveTestAction);
-        testMenu->addAction(removeAllTestAction_);
-	testMenu->addSeparator();
-	testMenu->addAction(selectAndRunTest);
-	testMenu->addAction(selectAndRunAllTest);
-	testMenu->addAction(selectAndKillTest);
-        testMenu->addAction(selectAndKillAllTest_);
+    testMenu->addAction(addRunEnvAction);
+    testMenu->addSeparator();
+    testMenu->addAction(selectAndRunTest);
+    testMenu->addAction(selectAndKillTest);
+    testMenu->addAction(selectAndRevealExplorerTestAction_);
+    testMenu->addAction(selectAndRemoveTestAction);
+    testMenu->addSeparator();
+    testMenu->addAction(runAllTestsAction);
+    testMenu->addAction(killAllTestsAction_);
+    testMenu->addAction(revealExplorerTestResultAction_);
+    testMenu->addAction(removeAllTestsAction_);
 
-	q->menuBar()->addMenu(testMenu);
-
-        connect(addRunEnvAction, &QAction::triggered, [this]()
-	{
-		QString filter;
-#ifdef Q_OS_WIN32
-		filter = "RunEnv (*.bat)";
-#else
-                // TODO: extend filter?
-		filter = "RunEnv (*.sh)";
-#endif
-                QString filename = QFileDialog::getOpenFileName(q_ptr, "Select RunEnv.bat/sh", currentRunEnvPath_, filter);
-
-                if (filename.isEmpty())
-                {
-                    return;
-                }
-		else
-		{
-                    QFileInfo info(filename);
-                    QString runEnvPath = info.absoluteFilePath();
-                    auto alreadyIndex = runEnvComboBox_->findText(runEnvPath);
-                    if (alreadyIndex != -1)
-                    {
-                        runEnvComboBox_->setCurrentIndex(alreadyIndex);
-                        return;
-                    }
-
-                    saveTestSettingsForCurrentRunEnv();
-                    removeAllTest(true);
-                    currentRunEnvPath_ = runEnvPath;
-                    updateTestExecutables();
-
-                    if (runEnvModel_->insertRow(runEnvModel_->rowCount()))
-                    {
-                        auto index = runEnvModel_->index(runEnvModel_->rowCount() - 1, 0);
-                        runEnvModel_->setData(index, runEnvPath);
-                    }
-                    runEnvComboBox_->setCurrentIndex(runEnvComboBox_->count() - 1);
-		}
-	});
-
-	connect(selectAndRemoveTestAction, &QAction::triggered, [this]
-	{
-		removeTest(getTestIndexDialog("Select test to remove:"));
-	});
-
-        connect(removeAllTestAction_, &QAction::triggered, [this]
-        {
-            removeAllTest();
-        });
-
-	connect(selectAndRunTest, &QAction::triggered, [this]
-	{
-		QModelIndex index = getTestIndexDialog("Select Test to run:");
-		if(index.isValid())
-			runTestInThread(index.data(QExecutableModel::PathRole).toString(), false);
-	});
-
-	connect(selectAndRunAllTest, &QAction::triggered, [this]
-	{
-		for (size_t i = 0; i < executableTreeView->model()->rowCount(); ++i)
-		{
-			QModelIndex index = executableTreeView->model()->index(i, 0);
-			runTestInThread(index.data(QExecutableModel::PathRole).toString(), false);
-		}
-	});
-
-	connect(selectAndKillTest, &QAction::triggered, [this]
-	{
-		QModelIndex index = getTestIndexDialog("Select Test to kill:", true);
-		QString name = index.data(QExecutableModel::NameRole).toString();
-		if (index.isValid())
-			if (QMessageBox::question(this->q_ptr, "Kill Test?", "Are you sure you want to kill test: " + name + "?", QMessageBox::Yes, QMessageBox::No) == QMessageBox::Yes)
-				emitKillTest(index.data(QExecutableModel::PathRole).toString());
-	});
-
-        connect(selectAndKillAllTest_, &QAction::triggered, [this]
-        {
-            killAllTest();
-        });
-}
-
-void MainWindowPrivate::killAllTest(const bool confirm)
-{
-    if (confirm || QMessageBox::question(this->q_ptr, "Kill All Test?", "Are you sure you want to kill all test?", QMessageBox::Yes, QMessageBox::No) == QMessageBox::Yes)
-    {
-        for (size_t i = 0; i < executableTreeView->model()->rowCount(); ++i)
-        {
-            QModelIndex index = executableTreeView->model()->index(i, 0);
-            emitKillTest(index.data(QExecutableModel::PathRole).toString());
-        }
-    }
-}
-
-void MainWindowPrivate::killAllTestAndWait()
-{
-    killAllTest(true);
-    // Busy waiting till all threads are terminated
-    bool isFinished = false;
-    while (!isFinished)
-    {
-        isFinished = true;
-        for (const auto& entry : testRunningHash)
-        {
-            if (entry.second.load())
-            {
-                isFinished = false;
-                break;
-            }
-        }
-        if (!isFinished)
-        {
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        }
-    }
-}
-
-void MainWindowPrivate::createToolBar()
-{
-    toolBar_->setObjectName("toolbar");
-    toolBar_->setWindowTitle("Toolbar");
-    toolBar_->addWidget(runEnvComboBox_);
-
-    runEnvComboBox_->setSizeAdjustPolicy(QComboBox::AdjustToContents);
-    runEnvComboBox_->setModel(runEnvModel_);
-    connect(runEnvComboBox_, &QComboBox::currentTextChanged, [this]
-            (const QString& selectedRunEnv)
-    {
-        // only reload if changed and had one selected before
-        if (currentRunEnvPath_ != selectedRunEnv && !currentRunEnvPath_.isEmpty() && !selectedRunEnv.isEmpty())
-        {
-            saveTestSettingsForCurrentRunEnv();
-            removeAllTest(true);
-            currentRunEnvPath_ = selectedRunEnv;
-            loadTestSettingsForCurrentRunEnv();
-        }
-    });
-}
-
-void MainWindowPrivate::updateTestExecutables()
-{
-    static QStringList testDriverFilter = { "TestDriver.py" };
-
-    if (currentRunEnvPath_.isEmpty())
-    {
-        return;
-    }
-
-    QDir homeBase;
-#ifdef Q_OS_WIN32
-    homeBase = QFileInfo(currentRunEnvPath_).dir();
-#else
-    // TODO: make for env.sh
-    return;
-#endif
-
-    // Temporally disable until test executables are added
-    runEnvComboBox_->setEnabled(false);
-
-    // Remove all old and add again
-    removeAllTest(true);
-
-    homeBase.setNameFilters(testDriverFilter);
-    QDirIterator it(homeBase, QDirIterator::Subdirectories);
-    while (it.hasNext())
-    {
-        QFileInfo testDriverFileInfo(it.next());
-        
-        // Get test executables with list-test-exess option
-        QProcess testProcess;
-        QStringList arguments(testDriverFileInfo.absoluteFilePath());
-        arguments << "--list-test-exes";
-        testProcess.start("py", arguments);
-
-        if (testProcess.waitForFinished(500))
-        {
-            QString output = testProcess.readAllStandardOutput();
-            for (const auto& testExe : output.split(QRegExp("[\r\n]"), QString::SkipEmptyParts))
-            {
-                addTestExecutable(testExe.trimmed(), testDriverFileInfo.absoluteFilePath(), false, QDateTime());
-            }
-        }
-        else
-        {
-            testProcess.kill();
-        }
-    }
-
-    runEnvComboBox_->setEnabled(true);
+    q->menuBar()->addMenu(testMenu);
 }
 
 //--------------------------------------------------------------------------------------------------

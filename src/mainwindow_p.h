@@ -151,10 +151,12 @@ public:
 	QAction*								killTestAction;							///< Kills a running test
         // Reveal Test Results in Explorer
         QAction* revealExplorerTestAction_;
+        QAction* selectAndRevealExplorerTestAction_;
+        QAction* revealExplorerTestResultAction_;
 	QAction*								runTestAction;							///< Manually forces a test-run.
 	QAction*								removeTestAction;						///< Removes a test from being watched.
         // Remove all tests
-        QAction* removeAllTestAction_;
+        QAction* removeAllTestsAction_;
 	
 	QMenu*									optionsMenu;							///< Menu to set system options
         // Enable synchronous test execution
@@ -165,15 +167,15 @@ public:
 	QAction*								notifyOnSuccessAction;					///< Enable success notifications
 
 	QMenu*									windowMenu;								///< Menu to display/change dock visibility.
-
 	QMenu*									testMenu;								///< Menu for test-related actions
+
         QAction*								addRunEnvAction;							///< Opens a dialog to add a new _RunEnv
 	QAction*								selectAndKillTest;						///< Selects and kills a running test.
         // Kills all running test
-        QAction* selectAndKillAllTest_;
+        QAction* killAllTestsAction_;
 	QAction*								selectAndRemoveTestAction;				///< Remove a test after choosing it from a list.
 	QAction*								selectAndRunTest;						///< Run a test after selecting it from a list.																	///< program options.
-	QAction*								selectAndRunAllTest;					///< Run all tests in the list.
+        QAction*								runAllTestsAction;					///< Run all tests in the list.
 
 	QMenu*									testCaseViewContextMenu;				///< Context menu for the test case tree view
 	QAction*								testCaseViewExpandAllAction;			///< expands all nodes in the test case tree view
@@ -238,7 +240,9 @@ public:
 
 protected:
 
-	void createTestMenu();
+        void createToolBar();
+
+        void createTestMenu();
 	void createOptionsMenu();
 	void createWindowMenu();
 	void createHelpMenu();
@@ -247,7 +251,6 @@ protected:
 	void createExecutableContextMenu();
 	void createTestCaseViewContextMenu();
 	void createConsoleContextMenu();
-        void createToolBar();
 
 	QModelIndex getTestIndexDialog(const QString& label, bool running = false);
 
