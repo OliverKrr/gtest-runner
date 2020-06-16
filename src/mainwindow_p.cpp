@@ -19,12 +19,35 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
+#include <QThreadPool>
 
 
 namespace
 {
 static const QString GTEST_RESULT_NAME = "gtest-runner_result.xml";
+static const int MAX_PARALLEL_TEST_EXEC = QThreadPool::globalInstance()->maxThreadCount();
 }
+
+/* \brief Simple exception-safe semaphore locker
+*/
+class SemaphoreLocker
+{
+public:
+    SemaphoreLocker(QSemaphore& semaphore, int n = 1)
+        : semaphore_(semaphore), n_(n)
+    {
+        semaphore_.acquire(n_);
+    }
+    virtual ~SemaphoreLocker()
+    {
+        semaphore_.release(n_);
+    }
+
+private:
+    QSemaphore& semaphore_;
+    int n_;
+};
+
 
 //--------------------------------------------------------------------------------------------------
 //	FUNCTION: MainWindowPrivate
@@ -58,7 +81,8 @@ MainWindowPrivate::MainWindowPrivate(QStringList tests, bool reset, MainWindow* 
 	consoleHighlighter(new QStdOutSyntaxHighlighter(consoleTextEdit)),
 	consoleFindDialog(new FindDialog(consoleTextEdit)),
 	systemTrayIcon(new QSystemTrayIcon(QIcon(":/images/logo"), q)),
-	mostRecentFailurePath("")
+	mostRecentFailurePath(""),
+        runTestParallelSemaphore_(MAX_PARALLEL_TEST_EXEC)
 {
 	qRegisterMetaType<QVector<int>>("QVector<int>");
 
@@ -495,6 +519,7 @@ void MainWindowPrivate::addTestExecutable(const QString& path, const QString& te
 		executableTreeView->resizeColumnToContents(i);
 	}
 
+        testKillHandler_[path] = nullptr;
 	testRunningHash[path] = false;
 
 	// if there are no previous results but the test is being watched, run the test
@@ -522,7 +547,7 @@ void MainWindowPrivate::runTestInThread(const QString& pathToTest, bool notify)
 		// kill the running test instance first if there is one
 		if (testRunningHash[pathToTest])
 		{
-			emit killTest(pathToTest);
+                        emitKillTest(pathToTest);
 
 			std::unique_lock<std::mutex> lock(threadKillMutex);
 			threadKillCv.wait(lock, [&, pathToTest] {return !testRunningHash[pathToTest]; });
@@ -533,11 +558,25 @@ void MainWindowPrivate::runTestInThread(const QString& pathToTest, bool notify)
 		executableModel->setData(executableModel->index(pathToTest), ExecutableData::RUNNING, QExecutableModel::StateRole);
 		
 		QFileInfo info(pathToTest);
+                QString testName = executableModel->index(pathToTest).data(QExecutableModel::NameRole).toString();
 		QProcess testProcess;
 
 		bool first = true;
 		int tests = 0;
 		int progress = 0;
+
+
+                auto tearDown = [&, pathToTest](const QString& output)
+                {
+                    emit testOutputReady(output);
+                    emit testProgress(pathToTest, 0, 0);
+
+                    testKillHandler_[pathToTest] = nullptr;
+                    testRunningHash[pathToTest] = false;
+                    threadKillCv.notify_all();
+
+                    loop.exit();
+                };
 
 		// when the process finished, read any remaining output then quit the loop
                 connect(&testProcess, static_cast<void (QProcess::*)(int, QProcess::ExitStatus)>(&QProcess::finished), &loop, [&, pathToTest]
@@ -547,60 +586,61 @@ void MainWindowPrivate::runTestInThread(const QString& pathToTest, bool notify)
                         // 0 for success and 1 if test have failed -> in both cases a result xml was generated
                         if (exitStatus == QProcess::NormalExit && (exitCode == 0 || exitCode == 1))
 			{
-				output.append("\nTEST RUN COMPLETED: " + QDateTime::currentDateTime().toString("yyyy-MMM-dd hh:mm:ss.zzz") + "\n\n");
+                                output.append("\nTEST RUN COMPLETED: " + QDateTime::currentDateTime().toString("yyyy-MMM-dd hh:mm:ss.zzz") + " " + testName + "\n\n");
 				emit testResultsReady(pathToTest, notify);
 			}
 			else
 			{
-				output.append("\nTEST RUN EXITED WITH ERRORS: " + QDateTime::currentDateTime().toString("yyyy-MMM-dd hh:mm:ss.zzz") + "\n\n");
+                                output.append("\nTEST RUN EXITED WITH ERRORS: " + QDateTime::currentDateTime().toString("yyyy-MMM-dd hh:mm:ss.zzz") + " " + testName + "\n\n");
 				executableModel->setData(executableModel->index(pathToTest), ExecutableData::NOT_RUNNING, QExecutableModel::StateRole);
 			}
 			
-			emit testOutputReady(output);
-			emit testProgress(pathToTest, 0, 0);
-
-			testRunningHash[pathToTest] = false;
-			threadKillCv.notify_all();
-
-			loop.exit();
+                        tearDown(output);
 		}, Qt::QueuedConnection);
+
+                testKillHandler_[pathToTest] = new KillTestWrapper(&testProcess);
 
 		// get killed if asked to do so
-		connect(this, &MainWindowPrivate::killTest, &loop, [&, pathToTest]
-                        (const QString& pathToTestToKill)
+                connect(testKillHandler_[pathToTest].load(), &KillTestWrapper::killTest, &loop, [&, pathToTest]
 		{
-                        if (pathToTest != pathToTestToKill)
+                        // Try at least a few times to terminate gracefully
+                        // If User uses "Kill All Tests" the TestDriver can be in a state,
+                        // where he is not ready to receive the "terminate" command, yet.
+                        bool terminated = false;
+                        for (int i = 0; i < 10; ++i)
                         {
-                            return;
+                            // terminate over std::in, as testProcess.terminate() sends WM_CLOSE under windows that is complex to catch
+                            testProcess.write("terminate\n");
+                            testProcess.waitForBytesWritten();
+                            // Give 0.5s to finish
+                            if (testProcess.waitForFinished(500))
+                            {
+                                terminated = true;
+                                break;
+                            }
                         }
-                        // terminate over std::in, as terminate() sends WM_CLOSE under windows that is complex to catch
-                        testProcess.write("terminate");
-                        testProcess.closeWriteChannel();
-                        // Give 0.5s to finish
-                        if (!testProcess.waitForFinished(500))
+                        if (!terminated)
                         {
                             testProcess.kill();
+                            testProcess.waitForFinished();
                         }
 			QString output = testProcess.readAllStandardOutput();
-			output.append("\nTEST RUN KILLED: " + QDateTime::currentDateTime().toString("yyyy-MMM-dd hh:mm:ss.zzz") + "\n\n");
+                        output.append("\nTEST RUN KILLED: " + QDateTime::currentDateTime().toString("yyyy-MMM-dd hh:mm:ss.zzz") + " " + testName + "\n\n");
 
 			executableModel->setData(executableModel->index(pathToTest), ExecutableData::NOT_RUNNING, QExecutableModel::StateRole);
-
-			emit testOutputReady(output);
-			emit testProgress(pathToTest, 0, 0);
-
-			testRunningHash[pathToTest] = false;
-			threadKillCv.notify_all();
-
-			loop.exit();
+                        tearDown(output);
 		}, Qt::QueuedConnection);
 
 
-                // don't lock by default -> only if runTestsSynchronousAction_ is checked
-                std::unique_lock<std::mutex> runTestThreadSynchronousLock(runTestThreadSynchronous_, std::defer_lock);
-                if (runTestsSynchronousAction_->isChecked())
+                // Register killTest before lock -> possible to Kill All Tests
+                int numberLock = runTestsSynchronousAction_->isChecked() ? MAX_PARALLEL_TEST_EXEC : 1;
+                const SemaphoreLocker runTestThreadSynchronousLock(runTestParallelSemaphore_, numberLock);
+                // Check if asked to be killed
+                if (!testKillHandler_[pathToTest].load() || testKillHandler_[pathToTest].load()->isKillRequested())
                 {
-                    runTestThreadSynchronousLock.lock();
+                    executableModel->setData(executableModel->index(pathToTest), ExecutableData::NOT_RUNNING, QExecutableModel::StateRole);
+                    tearDown("");
+                    return;
                 }
 
 
@@ -658,11 +698,9 @@ void MainWindowPrivate::runTestInThread(const QString& pathToTest, bool notify)
 		if (!testProcess.waitForReadyRead(500))
 		{
 			testProcess.kill();
-			testRunningHash[pathToTest] = false;
-				
-			emit testProgress(pathToTest, 0, 0);
-			emit testOutputReady("");
-				
+
+                        executableModel->setData(executableModel->index(pathToTest), ExecutableData::NOT_RUNNING, QExecutableModel::StateRole);
+                        tearDown("");				
 			return;
 		}
 
@@ -1191,7 +1229,7 @@ void MainWindowPrivate::createExecutableContextMenu()
 		QString path = executableTreeView->currentIndex().data(QExecutableModel::PathRole).toString();
 		QString name = executableTreeView->currentIndex().data(QExecutableModel::NameRole).toString();
 		if (QMessageBox::question(q, "Kill Test?", "Are you sure you want to kill test: " + name + "?", QMessageBox::Yes, QMessageBox::No) == QMessageBox::Yes)
-			emit killTest(path);
+                        emitKillTest(path);
 	});
 
         connect(revealExplorerTestAction_, &QAction::triggered, [this]
@@ -1364,7 +1402,7 @@ void MainWindowPrivate::createTestMenu()
 		QString name = index.data(QExecutableModel::NameRole).toString();
 		if (index.isValid())
 			if (QMessageBox::question(q, "Kill Test?", "Are you sure you want to kill test: " + name + "?", QMessageBox::Yes, QMessageBox::No) == QMessageBox::Yes)
-				emit killTest(index.data(QExecutableModel::PathRole).toString());
+				emitKillTest(index.data(QExecutableModel::PathRole).toString());
 	});
 
         connect(selectAndKillAllTest_, &QAction::triggered, [this, q]
@@ -1374,7 +1412,7 @@ void MainWindowPrivate::createTestMenu()
                 for (size_t i = 0; i < executableTreeView->model()->rowCount(); ++i)
                 {
                     QModelIndex index = executableTreeView->model()->index(i, 0);
-                    emit killTest(index.data(QExecutableModel::PathRole).toString());
+                    emitKillTest(index.data(QExecutableModel::PathRole).toString());
                 }
             }
         });
@@ -1383,6 +1421,7 @@ void MainWindowPrivate::createTestMenu()
 void MainWindowPrivate::createToolBar()
 {
     toolBar_->setObjectName("toolbar");
+    toolBar_->setWindowTitle("Toolbar");
     toolBar_->addWidget(runEnvComboBox_);
 
     runEnvComboBox_->setSizeAdjustPolicy(QComboBox::AdjustToContents);
@@ -1594,6 +1633,15 @@ void MainWindowPrivate::scrollToConsoleCursor()
 	int cursorY = consoleTextEdit->cursorRect().top();
     QScrollBar *vbar = consoleTextEdit->verticalScrollBar();
     vbar->setValue(vbar->value() + cursorY - 0);
+}
+
+void MainWindowPrivate::emitKillTest(const QString& path)
+{
+    auto findTest = testKillHandler_.find(path);
+    if (findTest != testKillHandler_.end() && findTest->second.load())
+    {
+        findTest->second.load()->emitKillTest();
+    }
 }
 
 

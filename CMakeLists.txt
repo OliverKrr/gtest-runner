@@ -134,6 +134,7 @@ src/qtfindreplacedialog/findreplace_global.h
 src/qtfindreplacedialog/findreplacedialog.h
 src/qtfindreplacedialog/findreplaceform.h
 src/qtfindreplacedialog/findreplace_global.h
+src/killTestWrapper.h
 )
 
 # .cpp files

@@ -48,6 +48,7 @@
 #include "QStdOutSyntaxHighlighter.h"
 #include "appinfo.h"
 #include "gtestModel.h"
+#include "killTestWrapper.h"
 
 #include <finddialog.h>
 
@@ -90,6 +91,7 @@
 #include <QToolBar>
 #include <QStringListModel>
 #include <QComboBox>
+#include <QSemaphore>
 
 #include <qglobal.h>
 
@@ -199,8 +201,10 @@ public:
 	// synchronization
 	std::mutex								threadKillMutex;						
 	std::condition_variable					threadKillCv;							///< Condition variable that is notified when a thread is killed.
-        // Mutex to start (and run) tests synchronous
-        std::mutex runTestThreadSynchronous_;
+        // Sempaphore to control synchronous test running
+        QSemaphore runTestParallelSemaphore_;
+        // Wrapper of signal to kill a specific test
+        std::map<QString, std::atomic<KillTestWrapper*>> testKillHandler_;
 
 signals:
 
@@ -210,7 +214,6 @@ signals:
 	void testOutputReady(QString);
 	void testProgress(QString path, int complete, int total);
 	void runTest(QString path, bool notify);
-	void killTest(QString path);													///< kills the test if it's currently running
 
 public:
 
@@ -246,6 +249,9 @@ protected:
 	QModelIndex getTestIndexDialog(const QString& label, bool running = false);
 
 	void scrollToConsoleCursor();
+
+        ///< kills the test if it's currently running
+        void emitKillTest(const QString& path);
 
         void saveCommonSettings(const QString& path) const;
         void saveTestSettingsForCurrentRunEnv() const;
