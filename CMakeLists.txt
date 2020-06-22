@@ -11,7 +11,7 @@ set(QT_MINIMUM_VERSION 5.3.0)
 
 set(TARGET_NAME gtest-runner)
 
-# Use git branch as project name if clones from git
+# Use git tag as project name if clones from git
 find_package(Git)
 if(GIT_FOUND)
 	execute_process(
@@ -20,6 +20,8 @@ if(GIT_FOUND)
 	  OUTPUT_VARIABLE BRANCH
 	  OUTPUT_STRIP_TRAILING_WHITESPACE
 	)
+	# Replace / by - in branch
+	string(REPLACE "/" "-" BRANCH ${BRANCH})
 	execute_process(
 	  COMMAND ${GIT_EXECUTABLE} describe --abbrev=0 --tags
 	  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
@@ -100,7 +102,7 @@ endif(MSVC)
 set(APPLICATION_NAME ${TARGET_NAME})
 set(APPLICATION_VERSION ${VERSION})
 set(APPLICATION_ORGANIZATION "OliverKrr")
-set(APPLICATION_ORGANIZATION_DOMAIN "https://github.com/nholthaus/gtest-runner")
+set(APPLICATION_ORGANIZATION_DOMAIN "https://github.com/OliverKrr/gtest-runner")
 
 configure_file(src/appinfo.h.in appinfo.h @ONLY NEWLINE_STYLE UNIX)
 
@@ -277,14 +279,14 @@ if(WIN32)
 else(WIN32)
 	# DEBIAN CPACK_GENERATOR
 	SET(CPACK_GENERATOR "DEB")
-	SET(CPACK_DEBIAN_PACKAGE_MAINTAINER "Nic Holthaus")
+	SET(CPACK_DEBIAN_PACKAGE_MAINTAINER "Oliver Karrenbauer")
 	SET(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)	
 	# Deb packages can't have the 'v' in the version name
 	string(REGEX MATCH "[0-9][.][0-9][.][0-9]" VERSION_NUM "${APPLICATION_VERSION}")
 	set(CPACK_PACKAGE_VERSION ${VERSION_NUM})
 endif()
 
-set(CPACK_PACKAGE_CONTACT "Nic Holthaus <nholthaus@gmail.com>")
+set(CPACK_PACKAGE_CONTACT "Oliver Karrenbauer <oliver.karrenbauer@gmail.com>")
 set(CPACK_PACKAGE_NAME ${APPLICATION_NAME})
 set(CPACK_PACKAGE_VENDOR ${APPLICATION_ORGANIZATION})
 SET(CPACK_RESOURCE_FILE_README "${CMAKE_CURRENT_SOURCE_DIR}/README.md")

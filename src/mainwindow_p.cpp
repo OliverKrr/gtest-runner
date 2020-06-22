@@ -121,7 +121,8 @@ MainWindowPrivate::MainWindowPrivate(QStringList tests, bool reset, MainWindow* 
 	executableDockFrame->layout()->addWidget(executableTreeView);
         executableDockFrame->layout()->addWidget(updateTestsButton);
 
-        updateTestsButton->setText("Update tests (search RunEnv)");
+        updateTestsButton->setText("Update tests");
+        updateTestsButton->setToolTip("Search current RunEnv.bat/sh dir for TestDriver.py and related test executables (can be build with \"buildtest\" target)");
 
 	testCaseFilterEdit->setPlaceholderText("Filter Test Output...");
 	testCaseFilterEdit->setClearButtonEnabled(true);

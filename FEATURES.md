@@ -12,8 +12,7 @@
 	- [System notifications](#system-notifications)
 	- [Gtest support](#gtest-support)
 - [Test Executable dock](#test-executable-dock)
-	- [Drag-and-drop](#drag-and-drop)
-	- [Easily add and remove tests](#easily-add-and-remove-tests)
+	- [Easily update tests](#Easily-update-tests)
 	- [Re-run test](#re-run-test)
 	- [Kill test](#kill-test)
 	- [gtest command line options](#gtest-command-line-options)
@@ -40,7 +39,8 @@
 
 ![](resources/screenshots/screen.png)
 
-A Qt5 based automated test-runner and Graphical User Interface for Google Test unit tests
+A Qt5 based automated test-runner and Graphical User Interface for our Google Test unit tests.
+The following feature list is currently not up-to-date.
 
 ## Automatic test running
 
@@ -92,28 +92,27 @@ A Qt5 based automated test-runner and Graphical User Interface for Google Test u
 
 ![Test Executable Dock](resources/screenshots/testExecutableDock.png)
 
-## Drag-and-drop
+## Easily update tests
 
-- To add a test executable to watch, simply drag-and-drop the test executable file anywhere on the `gtest-runner` GUI.
+![Test Executable Dock](resources/screenshots/addEnv.png)
 
-## Easily add and remove tests
-
-![Add/remove](resources/screenshots/addremove.png)
-
-- In addition to drag-and-drop, it's easy to add or remove a test using the right-click context menu in the `Test Executable` window.
+- Add all unit tests by selecting your `RunEnv.bat/sh`.
+- Click _Update Tests_ to update the executable list (e.g. new test targets added/build/removed)
 
 ## Re-run test
 
 ![Re-run test](resources/screenshots/run.png)
 
-- You can manually re-run a test at any time by right-clicking on it and selecting `Run Test...`
+- You can manually re-run a test at any time by right-clicking on it and selecting `Run Test`
+- You can run all tests with corresponding button in tool bar (toggle `Run tests synchronous and not parallel` option to disable parallel test execution)
 
 ## Kill test
 
 ![Kill test](resources/screenshots/kill.png)
 
-- Did you just actually click run on your 4-hour CPU intensive test? No problem! Cancel a test at any time by right-clicking on it, and selecting `Kill Test...`.
-- _Hint:_ if the `Kill Test...` option is grayed out, that means your test isn't running (even if it has a yellow indicator).
+- Did you just actually click run on your 4-hour CPU intensive test? No problem! Cancel a test at any time by right-clicking on it, and selecting `Kill Test`.
+- _Hint:_ if the `Kill Test` option is grayed out, that means your test isn't running (even if it has a yellow indicator).
+- Use corresponding button in tool bar to kill all running tests
 
 ## gtest command line options
 
@@ -210,4 +209,4 @@ A Qt5 based automated test-runner and Graphical User Interface for Google Test u
 
 ![Cout](resources/screenshots/cout.png)
 
-- Like to mix `std::cout` debuggin with your gtests? No problem! All of your custom error messages are visible in the console window.
+- Enable the `Pipe all test output to Console Output` option to pipe all output (std::cout/cerr) from the test to the console output.

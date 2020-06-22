@@ -26,11 +26,12 @@
 //--------------------------------------------------------------------------------------------------
 //
 // ATTRIBUTION:
-// Parts of this work have been adapted from: 
+// Parts of this work have been adapted from: https://github.com/nholthaus/gtest-runner
 //
 //--------------------------------------------------------------------------------------------------
 // 
 // Copyright (c) 2016 Nic Holthaus
+// Copyright (c) 2020 Oliver Karrenbauer
 // 
 //--------------------------------------------------------------------------------------------------
 //

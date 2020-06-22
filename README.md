@@ -1,8 +1,10 @@
-# gtest-runner 
-[![Build Status](https://travis-ci.org/nholthaus/gtest-runner.svg?branch=master)](https://travis-ci.org/nholthaus/gtest-runner) [![Build Status](https://ci.appveyor.com/api/projects/status/github/nholthaus/gtest-runner?branch=master&svg=true)](https://ci.appveyor.com/project/nholthaus/gtest-gui) ![license](https://img.shields.io/badge/license-MIT-orange.svg) ![copyright](https://img.shields.io/badge/%C2%A9-Nic_Holthaus-orange.svg) ![copyright](https://img.shields.io/badge/%C2%A9-Oliver_Karrenbauer-orange.svg) ![language](https://img.shields.io/badge/language-c++-blue.svg) ![c++](https://img.shields.io/badge/std-c++14-blue.svg) ![Qt](https://img.shields.io/badge/Qt-5-blue.svg)<br>![msvc2013](https://img.shields.io/badge/MSVC-2013-ff69b4.svg) ![msvc2015](https://img.shields.io/badge/MSVC-2015-ff69b4.svg) ![gcc-4.9.3](https://img.shields.io/badge/GCC-4.9.3-ff69b4.svg) ![gcc-5.4.0](https://img.shields.io/badge/GCC-5.4.0-ff69b4.svg)
+# gtest-runner
+
+![license](https://img.shields.io/badge/license-MIT-orange.svg) ![copyright](https://img.shields.io/badge/%C2%A9-Nic_Holthaus-orange.svg) ![copyright](https://img.shields.io/badge/%C2%A9-Oliver_Karrenbauer-orange.svg) ![language](https://img.shields.io/badge/language-c++-blue.svg) ![c++](https://img.shields.io/badge/std-c++14-blue.svg) ![Qt](https://img.shields.io/badge/Qt-5-blue.svg)<br>![msvc2013](https://img.shields.io/badge/MSVC-2013-ff69b4.svg) ![msvc2015](https://img.shields.io/badge/MSVC-2015-ff69b4.svg) ![gcc-4.9.3](https://img.shields.io/badge/GCC-4.9.3-ff69b4.svg) ![gcc-5.4.0](https://img.shields.io/badge/GCC-5.4.0-ff69b4.svg)
 
 
-A Qt5 based automated test-runner and Graphical User Interface for Google Test unit tests
+A Qt5 based automated test-runner and Graphical User Interface for our Google Test unit tests.
+This project is a fork of [nholthaus/gtest-runner](https://github.com/nholthaus/gtest-runner) that is adapted to our build system with further improvements and adaptions.
 
 # Table of Contents
 
@@ -43,21 +45,11 @@ To date, gtest-runner has been tested on:
 
 ## Windows
 
-Visit the [Latest release page](https://github.com/nholthaus/gtest-runner/releases) for binary installers. 
-
-Since version 1.1.2, all Windows binaries are signed.
+Visit the [Release Page](https://github.com/OliverKrr/gtest-runner/releases) for binary installers.
 
 ## Ubuntu
 
-Binary packages are available through the [gtest-runner PPA](https://launchpad.net/~nholthaus/+archive/ubuntu/gtest-runner) for many versions of Ubuntu. To install gtest-runner via the PPA, type the following commands:
-
-```bash
-sudo add-apt-repository ppa:nholthaus/gtest-runner
-sudo apt-get update
-sudo apt-get install gtest-runner
-```
-
-Of course, you can also [build gtest-runner from source](BUILD.md).
+Currently you need to [build gtest-runner from source](BUILD.md).
 
 ## Other Linux Distributions
 
