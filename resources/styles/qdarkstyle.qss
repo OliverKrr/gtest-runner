@@ -21,13 +21,50 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-QToolTip
-{
-    border: 1px solid #76797C;
-    background-color: rgb(90, 102, 117);;
-    color: white;
-    padding: 5px;
-    opacity: 200;
+
+/* QToolTip ---------------------------------------------------------------
+
+https://doc.qt.io/qt-5/stylesheet-examples.html#customizing-qtooltip
+
+--------------------------------------------------------------------------- */
+QToolTip {
+  background-color: #148CD2;
+  border: 1px solid #19232D;
+  color: #19232D;
+  /* Remove padding, for fix combo box tooltip */
+  padding: 0px;
+  /* Remove opacity, fix #174 - may need to use RGBA */
+}
+
+/* QStatusBar -------------------------------------------------------------
+
+https://doc.qt.io/qt-5/stylesheet-examples.html#customizing-qstatusbar
+
+--------------------------------------------------------------------------- */
+QStatusBar {
+  border: 1px solid #32414B;
+  /* Fixes Spyder #9120, #9121 */
+  background: #32414B;
+  /* Fixes #205, white vertical borders separating items */
+}
+
+QStatusBar::item {
+  border: none;
+}
+
+QStatusBar QToolTip {
+  background-color: #148CD2;
+  border: 1px solid #19232D;
+  color: #19232D;
+  /* Remove padding, for fix combo box tooltip */
+  padding: 0px;
+  /* Reducing transparency to read better */
+  opacity: 230;
+}
+
+QStatusBar QLabel {
+  /* Fixes Spyder #9120, #9121 */
+  background: transparent;
 }
 
 QWidget
@@ -1169,10 +1206,6 @@ QToolBox::tab:selected { /* italicize selected tabs */
     font: italic;
     background-color: #31363b;
     border-color: #3daee9;
- }
-
-QStatusBar::item {
-    border: 0px transparent dark;
  }
 
 
