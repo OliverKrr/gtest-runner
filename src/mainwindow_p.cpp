@@ -451,7 +451,7 @@ MainWindowPrivate::MainWindowPrivate(QStringList tests, bool reset, MainWindow* 
 //--------------------------------------------------------------------------------------------------
 QString MainWindowPrivate::xmlPath(const QString& testPath, const bool create) const
 {
-    QString name = executableModel->index(testPath).data(QExecutableModel::NameRole).toString();
+    QString name = QFileInfo(testPath).baseName();
     QString hash = QCryptographicHash::hash(testPath.toLatin1(), QCryptographicHash::Md5).toHex();
     QString path = dataPath() + "/" + name + "_" + hash;
     if (create)
@@ -479,9 +479,10 @@ QString MainWindowPrivate::latestGtestResultPath(const QString& testPath)
 //--------------------------------------------------------------------------------------------------
 //	FUNCTION: addTestExecutable
 //--------------------------------------------------------------------------------------------------
-void MainWindowPrivate::addTestExecutable(const QString& path, const QString& testDriver, bool autorun, QDateTime lastModified,
-	QString filter /*= ""*/, int repeat /*= 0*/, Qt::CheckState runDisabled /*= Qt::Unchecked*/, 
-	Qt::CheckState shuffle /*= Qt::Unchecked*/, int randomSeed /*= 0*/, QString otherArgs /*= ""*/)
+void MainWindowPrivate::addTestExecutable(const QString& path, const QString& name, const QString& testDriver, bool autorun,
+                                          QDateTime lastModified, QString filter /*= ""*/, int repeat /*= 0*/,
+                                          Qt::CheckState runDisabled /*= Qt::Unchecked*/, Qt::CheckState shuffle /*= Qt::Unchecked*/,
+                                          int randomSeed /*= 0*/, QString otherArgs /*= ""*/)
 {
 	QFileInfo fileinfo(path);
 
@@ -503,6 +504,7 @@ void MainWindowPrivate::addTestExecutable(const QString& path, const QString& te
 
 	executableModel->setData(newRow, 0, QExecutableModel::ProgressRole);
 	executableModel->setData(newRow, path, QExecutableModel::PathRole);
+        executableModel->setData(newRow, name, QExecutableModel::NameRole);
         executableModel->setData(newRow, testDriver, QExecutableModel::TestDriverRole);
 	executableModel->setData(newRow, autorun, QExecutableModel::AutorunRole);
 	executableModel->setData(newRow, lastModified, QExecutableModel::LastModifiedRole);
@@ -530,12 +532,12 @@ void MainWindowPrivate::addTestExecutable(const QString& path, const QString& te
         testKillHandler_[path] = nullptr;
 	testRunningHash[path] = false;
 
-	// if there are no previous results but the test is being watched, run the test
-	if ((!previousResults || outOfDate) && autorun)
+	// only run if test has run before and is out of date now
+        if (outOfDate && previousResults && autorun)
 	{
 		this->runTestInThread(path, false);
 	}
-	else if (outOfDate && !autorun)
+	else if (outOfDate)
 	{
 		executableModel->setData(newRow, ExecutableData::NOT_RUNNING, QExecutableModel::StateRole);
 	}
@@ -944,6 +946,7 @@ void MainWindowPrivate::saveTestSettings(const QString& path) const
 
         QJsonObject test;
         test.insert("path", QJsonValue::fromVariant(index.data(QExecutableModel::PathRole)));
+        test.insert("name", QJsonValue::fromVariant(index.data(QExecutableModel::NameRole)));
         test.insert("testDriver", QJsonValue::fromVariant(index.data(QExecutableModel::TestDriverRole)));
         test.insert("autorun", QJsonValue::fromVariant(index.data(QExecutableModel::AutorunRole)));
         test.insert("lastModified", index.data(QExecutableModel::LastModifiedRole).toDateTime().toString(DATE_FORMAT));
@@ -1049,6 +1052,7 @@ void MainWindowPrivate::loadTestSettings(const QString& path)
         QJsonObject test = testRef.toObject();
 
         QString path = test["path"].toString();
+        QString name = test["name"].toString();
         QString testDriver = test["testDriver"].toString();
         bool autorun = test["autorun"].toBool();
         QDateTime lastModified = QDateTime::fromString(test["lastModified"].toString(), DATE_FORMAT);
@@ -1059,7 +1063,7 @@ void MainWindowPrivate::loadTestSettings(const QString& path)
         int seed = test["seed"].toInt();
         QString args = test["args"].toString();
 
-        addTestExecutable(path, testDriver, autorun, lastModified, filter, repeat, runDisabled, shuffle, seed, args);
+        addTestExecutable(path, name, testDriver, autorun, lastModified, filter, repeat, runDisabled, shuffle, seed, args);
     }
 }
 
@@ -1407,9 +1411,29 @@ void MainWindowPrivate::updateTestExecutables()
         if (testProcess.waitForFinished(500))
         {
             QString output = testProcess.readAllStandardOutput();
-            for (const auto& testExe : output.split(QRegExp("[\r\n]"), QString::SkipEmptyParts))
+            QStringList executables = output.split(QRegExp("[\r\n]"), QString::SkipEmptyParts);
+            bool autoRun = true;
+            for (const auto& testExe : executables)
             {
-                addTestExecutable(testExe.trimmed(), testDriverFileInfo.absoluteFilePath(), false, QDateTime());
+                QString name = QFileInfo(testExe).baseName();
+                // Only add ssuffix if more than one build
+                if (executables.size() != 1)
+                {
+                    if (testExe.contains("Debug"))
+                        name.append(" (Debug)");
+                    else if (testExe.contains("RelWithDebInfo"))
+                        name.append(" (RelWithDebInfo)");
+                    else if (testExe.contains("Release"))
+                        name.append(" (Release)");
+                    else if (testExe.contains("MinSizeRel"))
+                        name.append(" (MinSizeRel)");
+                }
+
+                addTestExecutable(testExe.trimmed(), name, testDriverFileInfo.absoluteFilePath(), autoRun, QDateTime());
+                // only autoRun one if we have multipl
+                // -> concurrent running of same test overwrites
+                // output test data dir of other process
+                autoRun = false;
             }
         }
         else

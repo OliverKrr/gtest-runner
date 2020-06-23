@@ -72,6 +72,7 @@ struct ExecutableData
 	ExecutableData(QString path = "") : path(path) {};
 
 	QString			path;				///< Full, absolute path to test executable
+        QString			name;				///< Display name of test executable
         QString			testDriver;			///< Full, absolute path to test driver
 	bool			autorun;			///< Whether to autorun the tests when they change.
 	States			state;				///< Current state of test execution

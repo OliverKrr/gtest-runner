@@ -72,8 +72,6 @@ Q_INVOKABLE QVariant QExecutableModel::data(const QModelIndex &index, int role /
 	if (itr == tree.end())
 		return QVariant();
 
-	QString name = QFileInfo(itr->path).baseName();
-
 	switch (role)
 	{
 	case Qt::DecorationRole:
@@ -121,6 +119,8 @@ Q_INVOKABLE QVariant QExecutableModel::data(const QModelIndex &index, int role /
 		return itr->autorun;
 	case PathRole:
 		return itr->path;
+        case NameRole:
+		return itr->name;
         case TestDriverRole:
             return itr->testDriver;
 	case StateRole:
@@ -141,16 +141,6 @@ Q_INVOKABLE QVariant QExecutableModel::data(const QModelIndex &index, int role /
 		return itr->randomSeed;
 	case ArgsRole:
 		return itr->otherArgs;
-	case NameRole:
-		if (itr->path.contains("Debug"))
-			name.append(" (Debug)");
-		else if (itr->path.contains("RelWithDebInfo"))
-			name.append(" (RelWithDebInfo)");
-		else if (itr->path.contains("Release"))
-			name.append(" (Release)");
-		else if (itr->path.contains("MinSizeRel"))
-			name.append(" (MinSizeRel)");
-		return name;
 	default:
 		return QVariant();
 	}
@@ -167,6 +157,9 @@ Q_INVOKABLE bool QExecutableModel::setData(const QModelIndex &index, const QVari
 	case Qt::EditRole || Qt::DisplayRole || QExecutableModel::PathRole:
 		itr->path = value.toString();
 		break;
+        case NameRole:
+            itr->name = value.toString();
+            break;
         case TestDriverRole:
             itr->testDriver = value.toString();
             break;
@@ -273,6 +266,7 @@ QMimeData * QExecutableModel::mimeData(const QModelIndexList &indexes) const
 		if (index.isValid() && index.column() == 0) 
 		{
 			QVariant PathRoleText = data(index, PathRole);
+                        QVariant NameRoleText = data(index, NameRole);
                         QVariant TestDriverText = data(index, TestDriverRole);
 			QVariant StateRoleText = data(index, StateRole);
 			QVariant LastModifiedRoleText = data(index, LastModifiedRole);
@@ -283,10 +277,9 @@ QMimeData * QExecutableModel::mimeData(const QModelIndexList &indexes) const
 			QVariant ShuffleRoleText = data(index, ShuffleRole);
 			QVariant RandomSeedRoleText = data(index, RandomSeedRole);
 			QVariant ArgsRoleText = data(index, ArgsRole);
-			QVariant NameRoleText = data(index, NameRole);
 			QVariant AutorunRoleText = data(index, AutorunRole);
-                        stream << PathRoleText << TestDriverText << StateRoleText << LastModifiedRoleText << ProgressRoleText << FilterRoleText << RepeatTestsRoleText <<
-				RunDisabledTestsRoleText << ShuffleRoleText << RandomSeedRoleText << ArgsRoleText << NameRoleText << AutorunRoleText;
+                        stream << PathRoleText << NameRoleText << TestDriverText << StateRoleText << LastModifiedRoleText << ProgressRoleText << FilterRoleText << RepeatTestsRoleText <<
+				RunDisabledTestsRoleText << ShuffleRoleText << RandomSeedRoleText << ArgsRoleText << AutorunRoleText;
 		}
 	}
 
@@ -316,6 +309,7 @@ bool QExecutableModel::dropMimeData(const QMimeData *data, Qt::DropAction action
 		while (!stream.atEnd()) {
 			QMap<int, QVariant> itemData;
 			stream >> itemData[PathRole];
+                        stream >> itemData[NameRole];
                         stream >> itemData[TestDriverRole];
 			stream >> itemData[StateRole];
 			stream >> itemData[LastModifiedRole];
@@ -326,7 +320,6 @@ bool QExecutableModel::dropMimeData(const QMimeData *data, Qt::DropAction action
 			stream >> itemData[ShuffleRole];
 			stream >> itemData[RandomSeedRole];
 			stream >> itemData[ArgsRole];
-			stream >> itemData[NameRole];
 			stream >> itemData[AutorunRole];
 			newItems.push_back(itemData);
 			++count;
@@ -356,6 +349,7 @@ QMap<int, QVariant> QExecutableModel::itemData(const QModelIndex &index) const
 	auto itr = indexToIterator(index);
 	QMap<int, QVariant> ret;
 	ret[PathRole] = itr->path;
+        ret[NameRole] = itr->name;
         ret[TestDriverRole] = itr->testDriver;
 	ret[StateRole] = itr->state;
 	ret[LastModifiedRole] = itr->lastModified;
@@ -381,6 +375,7 @@ bool QExecutableModel::setItemData(const QModelIndex &index, const QMap<int, QVa
 
 	auto itr = indexToIterator(index);
 	itr->path = roles[PathRole].toString();
+        itr->name = roles[NameRole].toString();
         itr->testDriver = roles[TestDriverRole].toString();
 	itr->state = (ExecutableData::States)roles[StateRole].toInt();
 	itr->lastModified = roles[LastModifiedRole].toDateTime();
