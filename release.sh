@@ -4,5 +4,3 @@ cmake ..
 cd ..
 cmake --build build --config Release
 cmake --build build --target PACKAGE --config Release
-
-./sign.bat
