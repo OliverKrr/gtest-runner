@@ -38,8 +38,15 @@ QVariant GTestModel::data(const QModelIndex &index, int role) const
 	case Qt::DisplayRole:
 		switch (index.column())
 		{
-		case Name:
-			return attributeMap.namedItem("name").nodeValue();
+                case Name:
+                {
+                    QString name = attributeMap.namedItem("name").nodeValue();
+                    if (attributeMap.contains("value_param"))
+                    {
+                        name += " (" + attributeMap.namedItem("value_param").nodeValue() + ")";
+                    }
+                    return name;
+                }
 		case TestNumber:
 			return item->row();
 		case Failures:
