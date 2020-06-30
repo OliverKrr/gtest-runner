@@ -199,6 +199,8 @@ public:
 	QHash<QString, bool>					executableCheckedStateHash;				///< Hash of the previous state of the checkboxes.
 	QHash<QString, QDomDocument>			testResultsHash;						///< Hash table storing the xml test results for each test path.
 	std::map<QString, std::atomic<bool>>	testRunningHash;						///< Stores whether the given test is actively running.
+        // Counter for all currently running tests
+        std::atomic_int numberOfRunningTests_;
         // Mapping test to latest test result dir
         std::map<QString, QString> testLatestTestRun_;
 
@@ -269,6 +271,8 @@ protected:
         void loadCommonSettings(const QString& path);
         void loadTestSettingsForCurrentRunEnv();
         void loadTestSettings(const QString& path);
+
+        void updateButtonsForRunningTests();
 
 
         QString settingsPath() const;

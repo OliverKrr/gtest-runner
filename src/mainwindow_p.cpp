@@ -190,6 +190,9 @@ MainWindowPrivate::MainWindowPrivate(QStringList tests, bool reset, MainWindow* 
 	createConsoleContextMenu();
 	createTestCaseViewContextMenu();
 
+        numberOfRunningTests_ = 0;
+        updateButtonsForRunningTests();
+
 	connect(this, &MainWindowPrivate::setStatus, statusBar, &QStatusBar::setStatusTip, Qt::QueuedConnection);
 	connect(this, &MainWindowPrivate::testResultsReady, this, &MainWindowPrivate::loadTestResults, Qt::QueuedConnection);
 	connect(this, &MainWindowPrivate::testResultsReady, statusBar, &QStatusBar::clearMessage, Qt::QueuedConnection);
@@ -562,6 +565,8 @@ void MainWindowPrivate::runTestInThread(const QString& pathToTest, bool notify)
 		}
 
 		testRunningHash[pathToTest] = true;
+                numberOfRunningTests_ += 1;
+                updateButtonsForRunningTests();
 
 		executableModel->setData(executableModel->index(pathToTest), ExecutableData::RUNNING, QExecutableModel::StateRole);
 		
@@ -582,6 +587,8 @@ void MainWindowPrivate::runTestInThread(const QString& pathToTest, bool notify)
 
                     testKillHandler_[pathToTest] = nullptr;
                     testRunningHash[pathToTest] = false;
+                    numberOfRunningTests_ -= 1;
+                    updateButtonsForRunningTests();
                     threadKillCv.notify_all();
 
                     loop.exit();
@@ -755,6 +762,28 @@ void MainWindowPrivate::runTestInThread(const QString& pathToTest, bool notify)
 
 	});
         t.detach();
+}
+
+void MainWindowPrivate::updateButtonsForRunningTests()
+{
+    int value = numberOfRunningTests_;
+    // Disable/Enable variouse UI buttons that are not supported if any test is running
+    if (value == 1 || value == 0)
+    {
+        bool areAnyRunning = value != 0;
+
+        addRunEnvAction->setEnabled(!areAnyRunning);
+        runEnvComboBox_->setEnabled(!areAnyRunning);
+        updateTestsButton->setEnabled(!areAnyRunning);
+
+        selectAndKillTest->setEnabled(areAnyRunning);
+        selectAndRemoveTestAction->setEnabled(!areAnyRunning);
+
+        killAllTestsAction_->setEnabled(areAnyRunning);
+        removeAllTestsAction_->setEnabled(!areAnyRunning);
+
+        // If we want to update actions from ContextMenu -> we have to also check valid index
+    }
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -1354,22 +1383,9 @@ void MainWindowPrivate::killAllTestAndWait()
 {
     killAllTest(true);
     // Busy waiting till all threads are terminated
-    bool isFinished = false;
-    while (!isFinished)
+    while (numberOfRunningTests_ != 0)
     {
-        isFinished = true;
-        for (const auto& entry : testRunningHash)
-        {
-            if (entry.second.load())
-            {
-                isFinished = false;
-                break;
-            }
-        }
-        if (!isFinished)
-        {
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
 }
 
@@ -1472,13 +1488,11 @@ void MainWindowPrivate::createExecutableContextMenu()
 		QModelIndex index = executableTreeView->indexAt(pos);
 		if (index.isValid())
 		{
+                        bool isTestRunning = testRunningHash[index.data(QExecutableModel::PathRole).toString()];
 			runTestAction->setEnabled(true);
-			if (testRunningHash[index.data(QExecutableModel::PathRole).toString()])
-				killTestAction->setEnabled(true);
-			else
-				killTestAction->setEnabled(false);
+                        killTestAction->setEnabled(isTestRunning);
                         revealExplorerTestAction_->setEnabled(QDir(xmlPath(index.data(QExecutableModel::PathRole).toString())).exists());
-                        removeTestAction->setEnabled(true);
+                        removeTestAction->setEnabled(!isTestRunning);
 		}
 		else
 		{
