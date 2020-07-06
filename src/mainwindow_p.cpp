@@ -500,7 +500,7 @@ QString MainWindowPrivate::latestGtestResultPath(const QString& testPath)
 //--------------------------------------------------------------------------------------------------
 void MainWindowPrivate::addTestExecutable(const QString& path, const QString& name, const QString& testDriver, bool autorun,
                                           QDateTime lastModified, QString filter /*= ""*/, int repeat /*= 0*/,
-                                          Qt::CheckState runDisabled /*= Qt::Unchecked*/, Qt::CheckState shuffle /*= Qt::Unchecked*/,
+                                          Qt::CheckState runDisabled /*= Qt::Unchecked*/, Qt::CheckState failFast /*= Qt::Unchecked*/, Qt::CheckState shuffle /*= Qt::Unchecked*/,
                                           int randomSeed /*= 0*/, QString otherArgs /*= ""*/)
 {
 	QFileInfo fileinfo(path);
@@ -531,6 +531,7 @@ void MainWindowPrivate::addTestExecutable(const QString& path, const QString& na
 	executableModel->setData(newRow, filter, QExecutableModel::FilterRole);
 	executableModel->setData(newRow, repeat, QExecutableModel::RepeatTestsRole);
 	executableModel->setData(newRow, runDisabled, QExecutableModel::RunDisabledTestsRole);
+        executableModel->setData(newRow, failFast, QExecutableModel::FailFastRole);
 	executableModel->setData(newRow, shuffle, QExecutableModel::ShuffleRole);
 	executableModel->setData(newRow, randomSeed, QExecutableModel::RandomSeedRole);
 	executableModel->setData(newRow, otherArgs, QExecutableModel::ArgsRole);
@@ -710,6 +711,9 @@ void MainWindowPrivate::runTestInThread(const QString& pathToTest, bool notify)
 
 		int runDisabled = executableModel->data(index, QExecutableModel::RunDisabledTestsRole).toInt();
 		if (runDisabled) arguments << "--gtest_also_run_disabled_tests";
+
+                int failFast = executableModel->data(index, QExecutableModel::FailFastRole).toInt();
+                if (failFast) arguments << "--gtest_fail_fast";
 
 		int shuffle = executableModel->data(index, QExecutableModel::ShuffleRole).toInt();
 		if (shuffle) arguments << "--gtest_shuffle";
@@ -998,6 +1002,7 @@ void MainWindowPrivate::saveTestSettings(const QString& path) const
         test.insert("filter", QJsonValue::fromVariant(index.data(QExecutableModel::FilterRole)));
         test.insert("repeat", QJsonValue::fromVariant(index.data(QExecutableModel::RepeatTestsRole)));
         test.insert("runDisabled", QJsonValue::fromVariant(index.data(QExecutableModel::RunDisabledTestsRole)));
+        test.insert("failFast", QJsonValue::fromVariant(index.data(QExecutableModel::FailFastRole)));
         test.insert("shuffle", QJsonValue::fromVariant(index.data(QExecutableModel::ShuffleRole)));
         test.insert("seed", QJsonValue::fromVariant(index.data(QExecutableModel::RandomSeedRole)));
         test.insert("args", QJsonValue::fromVariant(index.data(QExecutableModel::ArgsRole)));
@@ -1104,11 +1109,12 @@ void MainWindowPrivate::loadTestSettings(const QString& path)
         QString filter = test["filter"].toString();
         int repeat = test["repeat"].toInt();
         Qt::CheckState runDisabled = static_cast<Qt::CheckState>(test["runDisabled"].toInt());
+        Qt::CheckState failFast = static_cast<Qt::CheckState>(test["failFast"].toInt());
         Qt::CheckState shuffle = static_cast<Qt::CheckState>(test["shuffle"].toInt());
         int seed = test["seed"].toInt();
         QString args = test["args"].toString();
 
-        addTestExecutable(path, name, testDriver, autorun, lastModified, filter, repeat, runDisabled, shuffle, seed, args);
+        addTestExecutable(path, name, testDriver, autorun, lastModified, filter, repeat, runDisabled, failFast, shuffle, seed, args);
     }
 }
 

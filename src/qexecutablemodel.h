@@ -81,6 +81,7 @@ struct ExecutableData
 	QString			filter;				///< filter to be applied on gtest command line
 	int				repeat;				///< Number of times to repeat the test. Can be -1.
 	Qt::CheckState	runDisabled;		///< gtest command line to run disabled tests
+        Qt::CheckState	failFast;		///< gtest command line to fail fast
 	Qt::CheckState	shuffle;			///< gtest command line option to shuffle tests
 	int				randomSeed;			///< Random seed for the shuffle
 	QString			otherArgs;			///< any other dumb-ass args the user thinks I forgot.
@@ -124,12 +125,13 @@ public:
 		FilterRole = Qt::UserRole + 3,
 		RepeatTestsRole = Qt::UserRole + 4,
 		RunDisabledTestsRole = Qt::UserRole + 5,
-		ShuffleRole = Qt::UserRole + 6,
-		RandomSeedRole = Qt::UserRole + 7,
-		ArgsRole = Qt::UserRole + 8,
-		NameRole = Qt::UserRole + 9,
-		AutorunRole = Qt::UserRole + 10,
-                TestDriverRole = Qt::UserRole + 11,
+                FailFastRole = Qt::UserRole + 6,
+		ShuffleRole = Qt::UserRole + 7,
+		RandomSeedRole = Qt::UserRole + 8,
+		ArgsRole = Qt::UserRole + 9,
+		NameRole = Qt::UserRole + 10,
+		AutorunRole = Qt::UserRole + 11,
+                TestDriverRole = Qt::UserRole + 12,
 	};
 
  	explicit QExecutableModel(QObject* parent = nullptr);

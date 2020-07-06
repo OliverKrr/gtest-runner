@@ -231,7 +231,7 @@ public:
         QString latestGtestResultPath(const QString& testPath);
         void addTestExecutable(const QString& path, const QString& name, const QString& testDriver, bool autorun,
                                QDateTime lastModified, QString filter = "", int repeat = 0,
-                               Qt::CheckState runDisabled = Qt::Unchecked, Qt::CheckState shuffle = Qt::Unchecked,
+                               Qt::CheckState runDisabled = Qt::Unchecked, Qt::CheckState failFast = Qt::Unchecked, Qt::CheckState shuffle = Qt::Unchecked,
                                int randomSeed = 0, QString otherArgs = "");
 	void runTestInThread(const QString& pathToTest, bool notify);
 	bool loadTestResults(const QString& testPath, bool notify);

@@ -23,6 +23,8 @@ public:
 		gtestFilterEdit(new QLineEdit(q)),
 		gtestAlsoRunDisabledTestsLabel(new QLabel("Run disabled Tests:", q)),
 		gtestAlsoRunDisabledTestsCheckbox(new QCheckBox(q)),
+                gtestFailFastLabel(new QLabel("Fail fast:", q)),
+                gtestFailFastCheckbox(new QCheckBox(q)),
 		gtestRepeatLabel(new QLabel("Repeat Tests:", q)),
 		gtestRepeatLineEdit(new QLineEdit(q)),
 		gtestRepeatValidator(new QIntValidator(q)),
@@ -45,6 +47,8 @@ public:
 	QLineEdit*					gtestFilterEdit;
 	QLabel*						gtestAlsoRunDisabledTestsLabel;
 	QCheckBox*					gtestAlsoRunDisabledTestsCheckbox;
+        QLabel*						gtestFailFastLabel;
+        QCheckBox*					gtestFailFastCheckbox;
 	QLabel*						gtestRepeatLabel;
 	QLineEdit*					gtestRepeatLineEdit;
 	QIntValidator*				gtestRepeatValidator;
@@ -81,17 +85,26 @@ QExecutableSettingsDialog::QExecutableSettingsDialog(QWidget* parent /*= (QObjec
 	layout->addWidget(d->gtestRepeatLineEdit, 1, 1);
 	layout->addWidget(d->gtestAlsoRunDisabledTestsLabel, 2, 0);
 	layout->addWidget(d->gtestAlsoRunDisabledTestsCheckbox, 2, 1);
-	layout->addWidget(d->gtestShuffleLabel, 3, 0);
-	layout->addWidget(d->gtestShuffleCheckbox, 3, 1);
-	layout->addWidget(d->gtestRandomSeedLabel, 4, 0);
-	layout->addWidget(d->gtestRandomSeedLineEdit, 4, 1);
-	layout->addWidget(d->gtestOtherArgsLabel, 5, 0);
-	layout->addWidget(d->gtestOtherArgsLineEdit, 5, 1);
-	layout->addWidget(d->buttonBox, 6, 0, 2, 2);
+        layout->addWidget(d->gtestFailFastLabel, 3, 0);
+        layout->addWidget(d->gtestFailFastCheckbox, 3, 1);
+	layout->addWidget(d->gtestShuffleLabel, 4, 0);
+	layout->addWidget(d->gtestShuffleCheckbox, 4, 1);
+	layout->addWidget(d->gtestRandomSeedLabel, 5, 0);
+	layout->addWidget(d->gtestRandomSeedLineEdit, 5, 1);
+	layout->addWidget(d->gtestOtherArgsLabel, 6, 0);
+	layout->addWidget(d->gtestOtherArgsLineEdit, 6, 1);
+	layout->addWidget(d->buttonBox, 7, 0, 2, 2);
+
+        // This feature is introduced in 1ced315a483f4ecac21893ce6ceeb502afb82eff
+        // > v1.10.0 of googletest
+        d->gtestFailFastCheckbox->setEnabled(false);
+        // TODO if new googletest version is used -> enable feature again
+        d->gtestFailFastCheckbox->setToolTip("Only supported in googletest > v1.10.0 -> requires >= C++14");
 
 	d->gtestFilterEdit->setPlaceholderText("Use * for wildcard");
 	d->gtestFilterLabel->setToolTip("Sets the gtest_filter command line argument.");
 	d->gtestAlsoRunDisabledTestsCheckbox->setToolTip("sets the gtest_also_run_disabled_tests command line argument.");
+        //d->gtestFailFastCheckbox->setToolTip("Sets the gtest_fail_fast command line argument. Test execution will stop of first error.");
 	d->gtestRepeatLineEdit->setToolTip("set the gtest_repeat command line argument. A value of -1 will cause the test to run forever.");
 	d->gtestRepeatLineEdit->setText("1");
 	d->gtestRepeatLineEdit->setValidator(d->gtestRepeatValidator);
@@ -108,7 +121,8 @@ QExecutableSettingsDialog::QExecutableSettingsDialog(QWidget* parent /*= (QObjec
 
 	this->setTabOrder(d->gtestFilterEdit, d->gtestRepeatLineEdit);
 	this->setTabOrder(d->gtestRepeatLineEdit, d->gtestAlsoRunDisabledTestsCheckbox);
-	this->setTabOrder(d->gtestAlsoRunDisabledTestsCheckbox, d->gtestShuffleCheckbox);
+        this->setTabOrder(d->gtestAlsoRunDisabledTestsCheckbox, d->gtestFailFastCheckbox);
+        this->setTabOrder(d->gtestFailFastCheckbox, d->gtestShuffleCheckbox);
 	this->setTabOrder(d->gtestShuffleCheckbox, d->gtestRandomSeedLineEdit);
 	this->setTabOrder(d->gtestRandomSeedLineEdit, d->gtestOtherArgsLineEdit);
 	this->setTabOrder(d->gtestOtherArgsLineEdit, d->buttonBox->button(QDialogButtonBox::Ok));
@@ -141,6 +155,7 @@ void QExecutableSettingsDialog::setModelIndex(const QPersistentModelIndex& index
 	d->gtestFilterEdit->setText(index.data(QExecutableModel::FilterRole).toString());
 	d->gtestRepeatLineEdit->setText(index.data(QExecutableModel::RepeatTestsRole).toString());
 	d->gtestAlsoRunDisabledTestsCheckbox->setCheckState((Qt::CheckState)index.data(QExecutableModel::RunDisabledTestsRole).toInt());
+        d->gtestFailFastCheckbox->setCheckState((Qt::CheckState)index.data(QExecutableModel::FailFastRole).toInt());
 	d->gtestShuffleCheckbox->setCheckState((Qt::CheckState)index.data(QExecutableModel::ShuffleRole).toInt());
 	d->gtestRandomSeedLineEdit->setText(index.data(QExecutableModel::RandomSeedRole).toString());
 	d->gtestOtherArgsLineEdit->setText(index.data(QExecutableModel::ArgsRole).toString());
@@ -159,6 +174,7 @@ void QExecutableSettingsDialog::accept()
 		model->setData(model->index(d->index.row(), QExecutableModel::NameColumn), d->gtestFilterEdit->text(), QExecutableModel::FilterRole);
 		model->setData(model->index(d->index.row(), QExecutableModel::NameColumn), d->gtestRepeatLineEdit->text(), QExecutableModel::RepeatTestsRole);
 		model->setData(model->index(d->index.row(), QExecutableModel::NameColumn), d->gtestAlsoRunDisabledTestsCheckbox->checkState(), QExecutableModel::RunDisabledTestsRole);
+                model->setData(model->index(d->index.row(), QExecutableModel::NameColumn), d->gtestFailFastCheckbox->checkState(), QExecutableModel::FailFastRole);
 		model->setData(model->index(d->index.row(), QExecutableModel::NameColumn), d->gtestShuffleCheckbox->checkState(), QExecutableModel::ShuffleRole);
 		model->setData(model->index(d->index.row(), QExecutableModel::NameColumn), d->gtestRandomSeedLineEdit->text(), QExecutableModel::RandomSeedRole);
 		model->setData(model->index(d->index.row(), QExecutableModel::NameColumn), d->gtestOtherArgsLineEdit->text(), QExecutableModel::ArgsRole);
