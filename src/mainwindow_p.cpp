@@ -687,8 +687,9 @@ void MainWindowPrivate::runTestInThread(const QString& pathToTest, bool notify)
                 QString testDriver = executableModel->data(index, QExecutableModel::TestDriverRole).toString();
                 QString testDriverDir = QFileInfo(testDriver).dir().path();
 
-                QStringList arguments(testDriver);
+                QStringList arguments;
 
+                arguments << testDriver;
                 arguments << "-C";
                 arguments << info.dir().dirName();
                 arguments << "--output-dir";
@@ -729,6 +730,9 @@ void MainWindowPrivate::runTestInThread(const QString& pathToTest, bool notify)
                 testProcess.setWorkingDirectory(testDriverDir);
 
                 QString cmd = "\"" + currentRunEnvPath_ + "\" && py";
+#ifndef Q_OS_WIN32
+                cmd = "./" + cmd;
+#endif
 
 		// Start the test
                 testProcess.start(cmd, arguments);
@@ -1278,14 +1282,9 @@ void MainWindowPrivate::createToolBar()
 
     connect(addRunEnvAction, &QAction::triggered, [this]()
     {
-        QString filter;
-#ifdef Q_OS_WIN32
-        filter = "RunEnv (RunEnv.bat RunEnv.sh)";
-#else
-        // TODO: extend filter?
-        filter = "RunEnv (*.sh)";
-#endif
-        QString filename = QFileDialog::getOpenFileName(q_ptr, "Select RunEnv.bat/sh", currentRunEnvPath_, filter);
+        QString filter = "RunEnv (*.bat *.sh)";
+        QString caption = "Select RunEnv.bat or RunEnv.sh";
+        QString filename = QFileDialog::getOpenFileName(q_ptr, caption, currentRunEnvPath_, filter);
 
         if (filename.isEmpty())
         {
@@ -1419,14 +1418,8 @@ void MainWindowPrivate::updateTestExecutables()
     {
         return;
     }
-
-    QDir homeBase;
-#ifdef Q_OS_WIN32
-    homeBase = QFileInfo(currentRunEnvPath_).dir();
-#else
-    // TODO: make for env.sh
-    return;
-#endif
+	
+    QDir homeBase = QFileInfo(currentRunEnvPath_).dir();
 
     // Temporally disable until test executables are added
     runEnvComboBox_->setEnabled(false);
