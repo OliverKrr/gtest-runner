@@ -121,6 +121,8 @@ public:
 	QExecutableTreeView*					executableTreeView;						///< Widget to display and select gtest executables	
 	QExecutableModel*						executableModel;						///< Item model for test executables.
         QPushButton*							updateTestsButton;							///< Button to update tests and select a _RunEnv if not selected before
+        // Button to toggle the autorun checkboxes
+        QPushButton* toggleAutoRun_;
 	QFileSystemWatcher*						fileWatcher;							///< Hash table to store the file system watchers.
 	QStringList								executablePaths;						///< String list of all the paths, which can be used to re-constitute the filewatcher after an executable rebuild.
 

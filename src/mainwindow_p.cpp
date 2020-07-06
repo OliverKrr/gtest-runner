@@ -65,6 +65,7 @@ MainWindowPrivate::MainWindowPrivate(QStringList tests, bool reset, MainWindow* 
 	executableModel(new QExecutableModel(q)),
 	testCaseProxyModel(new QBottomUpSortFilterProxy(q)),
         updateTestsButton(new QPushButton(q)),
+        toggleAutoRun_(new QPushButton(q)),
 	fileWatcher(new QFileSystemWatcher(q)),
 	centralFrame(new QFrame(q)),
 	testCaseFilterEdit(new QLineEdit(q)),
@@ -119,7 +120,11 @@ MainWindowPrivate::MainWindowPrivate(QStringList tests, bool reset, MainWindow* 
 
 	executableDockFrame->setLayout(new QVBoxLayout);
 	executableDockFrame->layout()->addWidget(executableTreeView);
+        executableDockFrame->layout()->addWidget(toggleAutoRun_);
         executableDockFrame->layout()->addWidget(updateTestsButton);
+
+        toggleAutoRun_->setText("Toggle auto-run");
+        toggleAutoRun_->setToolTip("When auto-run is enabled, the test executables are being watched and automatically executed when being re-build.");
 
         updateTestsButton->setText("Update tests");
         updateTestsButton->setToolTip("Search current RunEnv.bat/sh dir for TestDriver.py and related test executables (can be build with \"buildtest\" target)");
@@ -197,6 +202,17 @@ MainWindowPrivate::MainWindowPrivate(QStringList tests, bool reset, MainWindow* 
 	connect(this, &MainWindowPrivate::testResultsReady, this, &MainWindowPrivate::loadTestResults, Qt::QueuedConnection);
 	connect(this, &MainWindowPrivate::testResultsReady, statusBar, &QStatusBar::clearMessage, Qt::QueuedConnection);
 	connect(this, &MainWindowPrivate::showMessage, statusBar, &QStatusBar::showMessage, Qt::QueuedConnection);
+
+        connect(toggleAutoRun_, &QPushButton::clicked, [this]()
+        {
+            for (size_t i = 0; i < executableModel->rowCount(); ++i)
+            {
+                auto index = executableModel->index(i, 0);
+                QString path = index.data(QExecutableModel::PathRole).toString();
+                bool prevState = executableCheckedStateHash[path];
+                executableModel->setData(index, !prevState, QExecutableModel::AutorunRole);
+            }
+        });
 
         // Update Tests
         connect(updateTestsButton, &QPushButton::clicked, [this]()
