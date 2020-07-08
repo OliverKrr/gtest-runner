@@ -679,13 +679,13 @@ void MainWindowPrivate::runTestInThread(const QString& pathToTest, bool notify)
 
                 QString currentDate = QDateTime::currentDateTime().toString(DATE_FORMAT);
                 QString copyResultDir = xmlPath(pathToTest, true) + "/" + currentDate;
+                QDir(copyResultDir).mkpath(".");
                 testLatestTestRun_[pathToTest] = currentDate;
 
 
 		// SET GTEST ARGS
 		QModelIndex index = executableModel->index(pathToTest);
                 QString testDriver = executableModel->data(index, QExecutableModel::TestDriverRole).toString();
-                QString testDriverDir = QFileInfo(testDriver).dir().path();
 
                 QStringList arguments;
 
@@ -700,7 +700,7 @@ void MainWindowPrivate::runTestInThread(const QString& pathToTest, bool notify)
                     arguments << "--pipe-log";
                 }
 
-                arguments << "--gtest_output=xml:\"" + testDriverDir + "/" + GTEST_RESULT_NAME + "\"";
+                arguments << "--gtest_output=xml:\"" + copyResultDir + "/" + GTEST_RESULT_NAME + "\"";
 
 		QString filter = executableModel->data(index, QExecutableModel::FilterRole).toString();
 		if (!filter.isEmpty()) arguments << "--gtest_filter=" + filter;
@@ -725,9 +725,6 @@ void MainWindowPrivate::runTestInThread(const QString& pathToTest, bool notify)
 		QString otherArgs = executableModel->data(index, QExecutableModel::ArgsRole).toString();
 		if(!otherArgs.isEmpty()) arguments << otherArgs;
 
-		// Set working directory to be the same as the executable
-		// (common standard for tests to find test-data files)
-                testProcess.setWorkingDirectory(testDriverDir);
 
                 QString cmd = "\"" + currentRunEnvPath_ + "\" && py";
 #ifndef Q_OS_WIN32
