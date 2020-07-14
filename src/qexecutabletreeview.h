@@ -31,6 +31,7 @@
 //--------------------------------------------------------------------------------------------------
 // 
 // Copyright (c) 2016 Nic Holthaus
+// Copyright (c) 2020 Oliver Karrenbauer
 // 
 //--------------------------------------------------------------------------------------------------
 
@@ -56,12 +57,17 @@ class QExecutableTreeViewPrivate;
 //--------------------------------------------------------------------------------------------------
 class QExecutableTreeView : public QTreeView
 {
+    Q_OBJECT
 public:
 
 	QExecutableTreeView(QWidget* parent = (QWidget*)0);
 
+    signals:
+        void itemSelectionChanged();
+
 protected:
 
+        virtual void selectionChanged(const QItemSelection &selected, const QItemSelection &deselected) override;
 	virtual void rowsInserted(const QModelIndex &parent, int start, int end) override;
 	virtual void rowsAboutToBeRemoved(const QModelIndex &parent, int start, int end) override;
 

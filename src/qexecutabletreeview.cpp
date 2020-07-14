@@ -23,6 +23,12 @@ QExecutableTreeView::QExecutableTreeView(QWidget* parent /*= (QWidget*)0*/) : QT
 
 }
 
+void QExecutableTreeView::selectionChanged(const QItemSelection &selected, const QItemSelection &deselected)
+{
+    QTreeView::selectionChanged(selected, deselected);
+    emit itemSelectionChanged();
+}
+
 //--------------------------------------------------------------------------------------------------
 //	FUNCTION: rowsInserted
 //--------------------------------------------------------------------------------------------------

@@ -25,6 +25,7 @@
 
 namespace
 {
+static const QString TEST_DRIVER_NAME = "TestDriver.py";
 static const QString GTEST_RESULT_NAME = "gtest-runner_result.xml";
 static const QString DATE_FORMAT = "yyyy.MM.dd_hh.mm.ss.zzz";
 static const int MAX_PARALLEL_TEST_EXEC = QThreadPool::globalInstance()->maxThreadCount();
@@ -1332,8 +1333,6 @@ void MainWindowPrivate::killAllTestAndWait()
 
 void MainWindowPrivate::updateTestExecutables()
 {
-    static QStringList testDriverFilter = { "TestDriver.py" };
-
     if (currentRunEnvPath_.isEmpty())
     {
         return;
@@ -1347,7 +1346,7 @@ void MainWindowPrivate::updateTestExecutables()
     // Remove all old and add again
     removeAllTest(true);
 
-    homeBase.setNameFilters(testDriverFilter);
+    homeBase.setNameFilters({ TEST_DRIVER_NAME });
     QDirIterator it(homeBase, QDirIterator::Subdirectories);
     while (it.hasNext())
     {
@@ -1410,6 +1409,7 @@ void MainWindowPrivate::createExecutableContextMenu()
         killTestAction = new QAction(q->style()->standardIcon(QStyle::SP_BrowserStop), "Kill Test", executableTreeView);
         killTestAction->setShortcut(QKeySequence(Qt::SHIFT + Qt::Key_F5));
         revealExplorerTestAction_ = new QAction(q->style()->standardIcon(QStyle::SP_DirOpenIcon), "Reveal Test Results", executableTreeView);
+
         removeTestAction = new QAction(q->style()->standardIcon(QStyle::SP_TrashIcon), "Remove Test", executableTreeView);
 
         // Also add here for shortcut
@@ -1423,26 +1423,38 @@ void MainWindowPrivate::createExecutableContextMenu()
 	executableContextMenu->addAction(removeTestAction);
 
 	executableTreeView->setContextMenuPolicy(Qt::CustomContextMenu);
+
+
+        auto setEnable = [this, q](QModelIndex index)
+        {
+            if (index.isValid())
+            {
+                bool isTestRunning = testRunningHash[index.data(QExecutableModel::PathRole).toString()];
+                runTestAction->setEnabled(true);
+                killTestAction->setEnabled(isTestRunning);
+                revealExplorerTestAction_->setEnabled(QDir(xmlPath(index.data(QExecutableModel::PathRole).toString())).exists());
+                removeTestAction->setEnabled(!isTestRunning);
+            }
+            else
+            {
+                runTestAction->setEnabled(false);
+                killTestAction->setEnabled(false);
+                revealExplorerTestAction_->setEnabled(false);
+                removeTestAction->setEnabled(false);
+            }
+        };
+
+        connect(executableTreeView, &QExecutableTreeView::itemSelectionChanged, [this, setEnable]()
+        {
+            QModelIndex index = executableTreeView->currentIndex();
+            setEnable(index);
+        });
 	
-	connect(executableTreeView, &QListView::customContextMenuRequested, [this, q](const QPoint& pos)
+        connect(executableTreeView, &QListView::customContextMenuRequested, [this, setEnable](const QPoint& pos)
 	{
 		QModelIndex index = executableTreeView->indexAt(pos);
-		if (index.isValid())
-		{
-                        bool isTestRunning = testRunningHash[index.data(QExecutableModel::PathRole).toString()];
-			runTestAction->setEnabled(true);
-                        killTestAction->setEnabled(isTestRunning);
-                        revealExplorerTestAction_->setEnabled(QDir(xmlPath(index.data(QExecutableModel::PathRole).toString())).exists());
-                        removeTestAction->setEnabled(!isTestRunning);
-		}
-		else
-		{
-			runTestAction->setEnabled(false);
-			killTestAction->setEnabled(false);
-                        revealExplorerTestAction_->setEnabled(false);
-                        removeTestAction->setEnabled(false);
-		}
-		executableContextMenu->exec(executableTreeView->mapToGlobal(pos));
+                setEnable(index);
+                executableContextMenu->exec(executableTreeView->mapToGlobal(pos));
 	});
 
 	connect(runTestAction, &QAction::triggered, [this]
