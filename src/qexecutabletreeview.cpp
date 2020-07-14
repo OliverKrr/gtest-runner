@@ -1,6 +1,7 @@
 #include "qexecutabletreeview.h"
 
 #include <QPushButton>
+#include <QFocusEvent>
 #include "executableSettingsDialog.h"
 
 class QExecutableTreeViewPrivate
@@ -46,6 +47,7 @@ void QExecutableTreeView::rowsInserted(const QModelIndex &parent, int start, int
 		advButton->setIcon(QIcon(":/images/hamburger"));
 		advButton->setToolTip("Advanced...");
 		advButton->setFixedSize(18, 18);
+                advButton->installEventFilter(this);
 		this->setIndexWidget(newRow, advButton);
 
 		connect(advButton, &QPushButton::clicked, [this, d, advButton]
@@ -64,6 +66,21 @@ void QExecutableTreeView::rowsInserted(const QModelIndex &parent, int start, int
 			}
 		});
 	}
+}
+
+bool QExecutableTreeView::eventFilter(QObject* obj, QEvent* event)
+{
+    if (event->type() == QEvent::FocusIn)
+    {
+        QPushButton* advButton = static_cast<QPushButton*>(obj);
+        auto pos = advButton->mapToGlobal(advButton->rect().center());
+        QModelIndex index = this->indexAt(this->mapFromGlobal(pos));
+        if (index.isValid())
+        {
+            this->setCurrentIndex(index);
+        }
+    }
+    return QObject::eventFilter(obj, event);
 }
 
 //--------------------------------------------------------------------------------------------------

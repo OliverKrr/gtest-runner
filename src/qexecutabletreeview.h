@@ -68,6 +68,7 @@ public:
 protected:
 
         virtual void selectionChanged(const QItemSelection &selected, const QItemSelection &deselected) override;
+        virtual bool eventFilter(QObject* obj, QEvent* event) override;
 	virtual void rowsInserted(const QModelIndex &parent, int start, int end) override;
 	virtual void rowsAboutToBeRemoved(const QModelIndex &parent, int start, int end) override;
 
