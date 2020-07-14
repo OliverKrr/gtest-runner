@@ -27,6 +27,7 @@ namespace
 {
 static const QString TEST_DRIVER_NAME = "TestDriver.py";
 static const QString GTEST_RESULT_NAME = "gtest-runner_result.xml";
+static const QString LATEST_RESULT_DIR_NAME = "latest";
 static const QString DATE_FORMAT = "yyyy.MM.dd_hh.mm.ss.zzz";
 static const int MAX_PARALLEL_TEST_EXEC = QThreadPool::globalInstance()->maxThreadCount();
 }
@@ -486,7 +487,7 @@ QString MainWindowPrivate::latestGtestResultPath(const QString& testPath)
     const QString basicPath = xmlPath(testPath);
     if (testLatestTestRun_.find(testPath) == testLatestTestRun_.end())
     {
-        const QStringList results = QDir(basicPath).entryList(QDir::Dirs, QDir::Name | QDir::Reversed);
+        const QStringList results = QDir(basicPath).entryList(QDir::Dirs, QDir::Time);
         if (results.isEmpty())
         {
             return QString();
@@ -678,10 +679,19 @@ void MainWindowPrivate::runTestInThread(const QString& pathToTest, bool notify)
                 }
 
 
-                QString currentDate = QDateTime::currentDateTime().toString(DATE_FORMAT);
-                QString copyResultDir = xmlPath(pathToTest, true) + "/" + currentDate;
+                QString testResultDirName;
+                if (enableTestHistoryAction_->isChecked())
+                {
+                    testResultDirName = QDateTime::currentDateTime().toString(DATE_FORMAT);
+                }
+                else
+                {
+                    testResultDirName = LATEST_RESULT_DIR_NAME;
+                }
+                QString copyResultDir = xmlPath(pathToTest, true) + "/" + testResultDirName;
+                QDir(copyResultDir).removeRecursively();
                 QDir(copyResultDir).mkpath(".");
-                testLatestTestRun_[pathToTest] = currentDate;
+                testLatestTestRun_[pathToTest] = testResultDirName;
 
 
 		// SET GTEST ARGS
@@ -955,6 +965,7 @@ void MainWindowPrivate::saveCommonSettings(const QString& path) const
     QJsonObject options;
     options.insert("runTestsSynchronous", runTestsSynchronousAction_->isChecked());
     options.insert("pipeAllTestOutput", pipeAllTestOutput_->isChecked());
+    options.insert("enableTestHistory", enableTestHistoryAction_->isChecked());
     options.insert("notifyOnFailure", notifyOnFailureAction->isChecked());
     options.insert("notifyOnSuccess", notifyOnSuccessAction->isChecked());
     options.insert("theme", themeActionGroup->checkedAction()->objectName());
@@ -1066,6 +1077,7 @@ void MainWindowPrivate::loadCommonSettings(const QString& path)
     QJsonObject options = root["options"].toObject();
     runTestsSynchronousAction_->setChecked(options["runTestsSynchronous"].toBool());
     pipeAllTestOutput_->setChecked(options["pipeAllTestOutput"].toBool());
+    enableTestHistoryAction_->setChecked(options["enableTestHistory"].toBool());
     notifyOnFailureAction->setChecked(options["notifyOnFailure"].toBool());
     notifyOnSuccessAction->setChecked(options["notifyOnSuccess"].toBool());
     themeMenu->findChild<QAction*>(options["theme"].toString())->trigger();
@@ -1403,6 +1415,7 @@ void MainWindowPrivate::createExecutableContextMenu()
 	Q_Q(MainWindow);
 
 	executableContextMenu = new QMenu(executableTreeView);
+        executableContextMenu->setToolTipsVisible(true);
 
         runTestAction = new QAction(q->style()->standardIcon(QStyle::SP_BrowserReload), "Run Test", executableTreeView);
         runTestAction->setShortcut(QKeySequence(Qt::Key_F5));
@@ -1493,6 +1506,7 @@ void MainWindowPrivate::createTestCaseViewContextMenu()
 	testCaseTreeView->setContextMenuPolicy(Qt::ActionsContextMenu);
 
 	testCaseViewContextMenu = new QMenu(testCaseTreeView);
+        testCaseViewContextMenu->setToolTipsVisible(true);
 
 	testCaseViewExpandAllAction = new QAction("Expand All", testCaseViewContextMenu);
 	testCaseViewCollapseAllAction = new QAction("Collapse All", testCaseViewContextMenu);
@@ -1547,6 +1561,7 @@ void MainWindowPrivate::createTestMenu()
     Q_Q(MainWindow);
 
     testMenu = new QMenu("Test", q);
+    testMenu->setToolTipsVisible(true);
 
     // Actions already created by createToolBar() -> mirror functionality
 
@@ -1568,15 +1583,22 @@ void MainWindowPrivate::createOptionsMenu()
 	Q_Q(MainWindow);
 
 	optionsMenu = new QMenu("Options", q);
+        optionsMenu->setToolTipsVisible(true);
 
         runTestsSynchronousAction_ = new QAction("Run tests synchronous and not parallel", optionsMenu);
         pipeAllTestOutput_ = new QAction("Pipe all test output to Console Output", optionsMenu);
+        enableTestHistoryAction_ = new QAction("Keep history of test results", optionsMenu);
 	notifyOnFailureAction = new QAction("Notify on auto-run Failure", optionsMenu);
 	notifyOnSuccessAction = new QAction("Notify on auto-run Success", optionsMenu);
+
+        enableTestHistoryAction_->setToolTip("Test result history can lead to increasing memory consumption");
+
         runTestsSynchronousAction_->setCheckable(true);
         runTestsSynchronousAction_->setChecked(false);
         pipeAllTestOutput_->setCheckable(true);
         pipeAllTestOutput_->setChecked(false);
+        enableTestHistoryAction_->setCheckable(true);
+        enableTestHistoryAction_->setChecked(false);
 	notifyOnFailureAction->setCheckable(true);
 	notifyOnFailureAction->setChecked(true);
 	notifyOnSuccessAction->setCheckable(true);
@@ -1584,6 +1606,7 @@ void MainWindowPrivate::createOptionsMenu()
 
         optionsMenu->addAction(runTestsSynchronousAction_);
         optionsMenu->addAction(pipeAllTestOutput_);
+        optionsMenu->addAction(enableTestHistoryAction_);
 	optionsMenu->addAction(notifyOnFailureAction);
 	optionsMenu->addAction(notifyOnSuccessAction);
 
@@ -1598,6 +1621,7 @@ void MainWindowPrivate::createWindowMenu()
 	Q_Q(MainWindow);
 
 	windowMenu = new QMenu("Window", q);
+        windowMenu->setToolTipsVisible(true);
 	windowMenu->addAction(executableDock->toggleViewAction());
 	windowMenu->addAction(failureDock->toggleViewAction());
 	windowMenu->addAction(consoleDock->toggleViewAction());
@@ -1613,6 +1637,7 @@ void MainWindowPrivate::createThemeMenu()
 	Q_Q(MainWindow);
 
 	themeMenu = new QMenu("Theme");
+        themeMenu->setToolTipsVisible(true);
 
 	defaultThemeAction = new QAction("Default Theme", themeMenu);
 	defaultThemeAction->setObjectName("defaultThemeAction");
@@ -1658,6 +1683,7 @@ void MainWindowPrivate::createHelpMenu()
 	Q_Q(MainWindow);
 
 	helpMenu = new QMenu("Help");
+        helpMenu->setToolTipsVisible(true);
 
 	aboutAction = new QAction("About...", helpMenu);
 
