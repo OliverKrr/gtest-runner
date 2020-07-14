@@ -1356,7 +1356,7 @@ void MainWindowPrivate::updateTestExecutables()
         QProcess testProcess;
         QStringList arguments(testDriverFileInfo.absoluteFilePath());
         arguments << "--list-test-exes";
-        testProcess.start("py", arguments);
+        testProcess.start("python", arguments);
 
         if (testProcess.waitForFinished(500))
         {
@@ -1478,7 +1478,7 @@ void MainWindowPrivate::createExecutableContextMenu()
             QString path = executableTreeView->currentIndex().data(QExecutableModel::PathRole).toString();
             QDesktopServices::openUrl(QUrl::fromLocalFile(xmlPath(path)));
         });
-
+	
 	connect(removeTestAction, &QAction::triggered, [this]
 	{
 		removeTest(executableTreeView->currentIndex());
