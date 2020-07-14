@@ -797,9 +797,6 @@ void MainWindowPrivate::updateButtonsForRunningTests()
         runEnvComboBox_->setEnabled(!areAnyRunning);
         updateTestsButton->setEnabled(!areAnyRunning);
 
-        selectAndKillTest->setEnabled(areAnyRunning);
-        selectAndRemoveTestAction->setEnabled(!areAnyRunning);
-
         killAllTestsAction_->setEnabled(areAnyRunning);
         removeAllTestsAction_->setEnabled(!areAnyRunning);
 
@@ -1210,32 +1207,6 @@ void MainWindowPrivate::clearSettings()
     }
 }
 
-//--------------------------------------------------------------------------------------------------
-//	FUNCTION: getTestDialog
-//--------------------------------------------------------------------------------------------------
-QModelIndex MainWindowPrivate::getTestIndexDialog(const QString& label, bool running /*= false*/)
-{
-	bool ok;
-        QMap<QString, QString> tests;
-
-	for (auto itr = executableModel->begin(); itr != executableModel->end(); ++itr)
-	{
-		QString path = itr->path;
-		if(!path.isEmpty() && (!running || testRunningHash[path]))
-			tests[executableModel->iteratorToIndex(itr).data(QExecutableModel::NameRole).toString()] = path;
-	}
-
-	if (tests.isEmpty())
-		return QModelIndex();
-
-	QString selected = QInputDialog::getItem(this->q_ptr, "Select Test", label, tests.keys(), 0, false, &ok);
-	QModelIndex match = executableModel->index(tests[selected]);
-	if (ok)
-		return match;
-	else
-		return QModelIndex();
-}
-
 void MainWindowPrivate::createToolBar()
 {
     Q_Q(MainWindow);
@@ -1247,13 +1218,6 @@ void MainWindowPrivate::createToolBar()
     runEnvComboBox_->setModel(runEnvModel_);
     runEnvComboBox_->setToolTip("Select current Run Environment. You can start a separate instance of gtest-runner for each environment");
 
-    selectAndRunTest = new QAction(q->style()->standardIcon(QStyle::SP_BrowserReload), "Run Test...", toolBar_);
-    selectAndRunTest->setShortcut(QKeySequence(Qt::Key_F5));
-    selectAndKillTest = new QAction(q->style()->standardIcon(QStyle::SP_BrowserStop), "Kill Test...", toolBar_);
-    selectAndKillTest->setShortcut(QKeySequence(Qt::SHIFT + Qt::Key_F5));
-    selectAndRevealExplorerTestAction_ = new QAction(q->style()->standardIcon(QStyle::SP_DirOpenIcon), "Reveal Test Results...", toolBar_);
-    selectAndRemoveTestAction = new QAction(q->style()->standardIcon(QStyle::SP_TrashIcon), "Remove Test...", toolBar_);
-
     runAllTestsAction = new QAction(q->style()->standardIcon(QStyle::SP_BrowserReload), "Run All Tests", toolBar_);
     runAllTestsAction->setShortcut(QKeySequence(Qt::Key_F6));
     killAllTestsAction_ = new QAction(q->style()->standardIcon(QStyle::SP_BrowserStop), "Kill All Tests", toolBar_);
@@ -1264,12 +1228,6 @@ void MainWindowPrivate::createToolBar()
     toolBar_->addWidget(new QLabel("Env:", toolBar_));
     toolBar_->addAction(addRunEnvAction);
     toolBar_->addWidget(runEnvComboBox_);
-    toolBar_->addSeparator();
-    toolBar_->addWidget(new QLabel("One:", toolBar_));
-    toolBar_->addAction(selectAndRunTest);
-    toolBar_->addAction(selectAndKillTest);
-    toolBar_->addAction(selectAndRevealExplorerTestAction_);
-    toolBar_->addAction(selectAndRemoveTestAction);
     toolBar_->addSeparator();
     toolBar_->addWidget(new QLabel("All:", toolBar_));
     toolBar_->addAction(runAllTestsAction);
@@ -1323,41 +1281,6 @@ void MainWindowPrivate::createToolBar()
             currentRunEnvPath_ = selectedRunEnv;
             loadTestSettingsForCurrentRunEnv();
         }
-    });
-
-    connect(selectAndRunTest, &QAction::triggered, [this]
-    {
-        QModelIndex index = getTestIndexDialog("Select Test to run:");
-        if (index.isValid())
-            runTestInThread(index.data(QExecutableModel::PathRole).toString(), false);
-    });
-
-    connect(selectAndKillTest, &QAction::triggered, [this]
-    {
-        QModelIndex index = getTestIndexDialog("Select Test to kill:", true);
-        if (index.isValid())
-        {
-            QString name = index.data(QExecutableModel::NameRole).toString();
-            if (QMessageBox::question(this->q_ptr, "Kill Test?", "Are you sure you want to kill test: " + name + "?", QMessageBox::Yes, QMessageBox::No) == QMessageBox::Yes)
-            {
-                emitKillTest(index.data(QExecutableModel::PathRole).toString());
-            }
-        }
-    });
-
-    connect(selectAndRevealExplorerTestAction_, &QAction::triggered, [this]
-    {
-        QModelIndex index = getTestIndexDialog("Select test to reveal explorer:");
-        if (index.isValid())
-        {
-            QString path = index.data(QExecutableModel::PathRole).toString();
-            QDesktopServices::openUrl(QUrl::fromLocalFile(xmlPath(path)));
-        }
-    });
-
-    connect(selectAndRemoveTestAction, &QAction::triggered, [this]
-    {
-        removeTest(getTestIndexDialog("Select test to remove:"));
     });
 
     connect(runAllTestsAction, &QAction::triggered, [this]
@@ -1482,10 +1405,16 @@ void MainWindowPrivate::createExecutableContextMenu()
 
 	executableContextMenu = new QMenu(executableTreeView);
 
-	runTestAction = new QAction(q->style()->standardIcon(QStyle::SP_BrowserReload), "Run Test", executableContextMenu);
-        killTestAction = new QAction(q->style()->standardIcon(QStyle::SP_BrowserStop), "Kill Test", executableContextMenu);
-        revealExplorerTestAction_ = new QAction(q->style()->standardIcon(QStyle::SP_DirOpenIcon), "Reveal Test Results", executableContextMenu);
-	removeTestAction = new QAction(q->style()->standardIcon(QStyle::SP_TrashIcon), "Remove Test", executableContextMenu);
+        runTestAction = new QAction(q->style()->standardIcon(QStyle::SP_BrowserReload), "Run Test", executableTreeView);
+        runTestAction->setShortcut(QKeySequence(Qt::Key_F5));
+        killTestAction = new QAction(q->style()->standardIcon(QStyle::SP_BrowserStop), "Kill Test", executableTreeView);
+        killTestAction->setShortcut(QKeySequence(Qt::SHIFT + Qt::Key_F5));
+        revealExplorerTestAction_ = new QAction(q->style()->standardIcon(QStyle::SP_DirOpenIcon), "Reveal Test Results", executableTreeView);
+        removeTestAction = new QAction(q->style()->standardIcon(QStyle::SP_TrashIcon), "Remove Test", executableTreeView);
+
+        // Also add here for shortcut
+        executableTreeView->addAction(runTestAction);
+        executableTreeView->addAction(killTestAction);
 
 	executableContextMenu->addAction(runTestAction);
 	executableContextMenu->addAction(killTestAction);
@@ -1610,11 +1539,6 @@ void MainWindowPrivate::createTestMenu()
     // Actions already created by createToolBar() -> mirror functionality
 
     testMenu->addAction(addRunEnvAction);
-    testMenu->addSeparator();
-    testMenu->addAction(selectAndRunTest);
-    testMenu->addAction(selectAndKillTest);
-    testMenu->addAction(selectAndRevealExplorerTestAction_);
-    testMenu->addAction(selectAndRemoveTestAction);
     testMenu->addSeparator();
     testMenu->addAction(runAllTestsAction);
     testMenu->addAction(killAllTestsAction_);
