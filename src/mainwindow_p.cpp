@@ -248,16 +248,21 @@ MainWindowPrivate::MainWindowPrivate(QStringList tests, bool reset, MainWindow* 
 			// only auto-run if the test is checked
 			if (m.data(QExecutableModel::AutorunRole).toBool())
 			{
-				emit showMessage("Change detected: " + path + "...");
-				// add a little delay to avoid running multiple instances of the same test build,
-				// and to avoid running the file before visual studio is done writting it.
-				QTimer::singleShot(500, [this, path] {emit runTestInThread(path, true); });
-				
-				// the directories tend to change A LOT for a single build, so let the watcher
-				// cool off a bit. Anyone who is actually building there code multiple times
-				// within 500 msecs on purpose is an asshole, and we won't support them.
-				fileWatcher->blockSignals(true);
-				QTimer::singleShot(500, [this, path] {emit fileWatcher->blockSignals(false); });
+			    emit showMessage("Change detected: " + path + "...");
+
+                            auto currentTime = QDateTime::currentDateTime();
+                            latestBuildChangeTime_[path] = currentTime;
+
+			    // add a little delay to avoid running multiple instances of the same test build,
+			    // and to avoid running the file before visual studio is done writting it.
+                            QTimer::singleShot(2000, [this, path, currentTime]
+                            {
+                                // Only run after latest update after timeout and not by previous triggers
+                                if (currentTime == latestBuildChangeTime_[path])
+                                {
+                                    emit runTestInThread(path, true);
+                                }
+                            });
 			}
 			else
 			{
@@ -553,6 +558,7 @@ void MainWindowPrivate::addTestExecutable(const QString& path, const QString& na
 
         testKillHandler_[path] = nullptr;
 	testRunningHash[path] = false;
+        latestBuildChangeTime_[path] = lastModified;
 
 	// only run if test has run before and is out of date now
         if (outOfDate && previousResults && autorun)

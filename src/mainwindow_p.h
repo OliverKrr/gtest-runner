@@ -211,6 +211,8 @@ public:
         QSemaphore runTestParallelSemaphore_;
         // Wrapper of signal to kill a specific test
         std::map<QString, std::atomic<KillTestWrapper*>> testKillHandler_;
+        // Temporary Time of latests build changes
+        std::map<QString, QDateTime> latestBuildChangeTime_;
 
 signals:
 
