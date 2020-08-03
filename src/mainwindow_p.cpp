@@ -1509,16 +1509,130 @@ void MainWindowPrivate::createExecutableContextMenu()
 //--------------------------------------------------------------------------------------------------
 void MainWindowPrivate::createTestCaseViewContextMenu()
 {
-	testCaseTreeView->setContextMenuPolicy(Qt::ActionsContextMenu);
+	testCaseTreeView->setContextMenuPolicy(Qt::CustomContextMenu);
 
 	testCaseViewContextMenu = new QMenu(testCaseTreeView);
         testCaseViewContextMenu->setToolTipsVisible(true);
 
+        testCaseViewRunTestCaseAction_ = new QAction("", testCaseViewContextMenu);
 	testCaseViewExpandAllAction = new QAction("Expand All", testCaseViewContextMenu);
 	testCaseViewCollapseAllAction = new QAction("Collapse All", testCaseViewContextMenu);
 
-	testCaseTreeView->addAction(testCaseViewExpandAllAction);
-	testCaseTreeView->addAction(testCaseViewCollapseAllAction);
+        testCaseViewContextMenu->addAction(testCaseViewRunTestCaseAction_);
+        testCaseViewContextMenu->addSeparator();
+        testCaseViewContextMenu->addAction(testCaseViewExpandAllAction);
+        testCaseViewContextMenu->addAction(testCaseViewCollapseAllAction);
+
+        enum SelectedLevel
+        {
+            Nothing,
+            AllTests,
+            TestSuite,
+            TestCase
+        };
+        auto getSelectedIndexLevel = [this](QModelIndex testCaseTreeViewIndex) -> SelectedLevel
+        {
+            auto index = testCaseProxyModel->mapToSource(testCaseTreeViewIndex);
+            if (!index.isValid())
+            {
+                return Nothing;
+            }
+            auto parentIndex = testCaseProxyModel->sourceModel()->parent(index);
+            if (!parentIndex.isValid())
+            {
+                return AllTests;
+            }
+            auto parentParentIndex = testCaseProxyModel->sourceModel()->parent(parentIndex);
+            if (!parentParentIndex.isValid())
+            {
+                return TestSuite;
+            }
+            return TestCase;
+        };
+
+        connect(testCaseTreeView, &QListView::customContextMenuRequested, [this, getSelectedIndexLevel](const QPoint& pos)
+        {
+            QModelIndex index = testCaseTreeView->indexAt(pos);
+
+            QString runActionText;
+            switch (getSelectedIndexLevel(index))
+            {
+            case Nothing:
+                // Nothing -> empty
+                break;
+            case AllTests:
+            {
+                runActionText = "Run All Tests";
+                break;
+            }
+            case TestSuite:
+            {
+                runActionText = "Run Test Suite";
+                break;
+            }
+            case TestCase:
+            {
+                runActionText = "Run Test Case";
+                break;
+            }
+            default:
+                break;
+            }
+            testCaseViewRunTestCaseAction_->setText(runActionText);
+            testCaseViewRunTestCaseAction_->setEnabled(!runActionText.isEmpty());
+
+            testCaseViewContextMenu->exec(testCaseTreeView->mapToGlobal(pos));
+        });
+
+        connect(testCaseViewRunTestCaseAction_, &QAction::triggered, [this, getSelectedIndexLevel]()
+        {
+            auto testCaseTreeViewIndex = testCaseTreeView->selectionModel()->currentIndex();
+            auto testCaseSourceIndex = testCaseProxyModel->mapToSource(testCaseTreeViewIndex);
+
+            QString testFilter;
+            switch (getSelectedIndexLevel(testCaseTreeViewIndex))
+            {
+            case Nothing:
+                // Nothing -> run all
+                break;
+            case AllTests:
+            {
+                // all tests -> empty filter
+                break;
+            }
+            case TestSuite:
+            {
+                auto testSuiteName = testCaseSourceIndex.data(GTestModel::Sections::Name).toString();
+                testFilter = testSuiteName + ".*";
+                break;
+            }
+            case TestCase:
+            {
+                auto testCaseName = testCaseSourceIndex.data(GTestModel::Sections::Name).toString();
+                auto testSuiteIndex = testCaseProxyModel->sourceModel()->parent(testCaseSourceIndex);
+                auto testSuiteName = testSuiteIndex.data(GTestModel::Sections::Name).toString();
+
+                testFilter = testSuiteName + ".";
+                if (testCaseName.contains(" ("))
+                {
+                    // name contains (value_param)
+                    testFilter += testCaseName.split(" (")[0];
+                }
+                else
+                {
+                    testFilter += testCaseName;
+                }
+                break;
+            }
+            default:
+                break;
+            }
+
+            QModelIndex execIndex = executableTreeView->selectionModel()->currentIndex();
+            executableModel->setData(execIndex, testFilter, QExecutableModel::FilterRole);
+            QString path = execIndex.data(QExecutableModel::PathRole).toString();
+            runTestInThread(path, false);
+        });
 
 	connect(testCaseViewExpandAllAction, &QAction::triggered, testCaseTreeView, &QTreeView::expandAll);
 	connect(testCaseViewCollapseAllAction, &QAction::triggered, testCaseTreeView, &QTreeView::collapseAll);

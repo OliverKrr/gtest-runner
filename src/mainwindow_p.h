@@ -179,6 +179,8 @@ public:
 
 	QMenu*									testCaseViewContextMenu;				///< Context menu for the test case tree view
 	QAction*								testCaseViewExpandAllAction;			///< expands all nodes in the test case tree view
+        // Action to set gtest filter and run only the specific test
+        QAction* testCaseViewRunTestCaseAction_;
 	QAction*								testCaseViewCollapseAllAction;			///< Collapses all nodes in the test case tree view.
 
 	QMenu*									consoleContextMenu;						///< Context menu for the console dock;
