@@ -129,7 +129,7 @@ MainWindowPrivate::MainWindowPrivate(QStringList tests, bool reset, MainWindow* 
         toggleAutoRun_->setToolTip("When auto-run is enabled, the test executables are being watched and automatically executed when being re-build.");
 
         updateTestsButton->setText("Update tests");
-        updateTestsButton->setToolTip("Search current RunEnv.bat/sh dir for TestDriver.py and related test executables (can be build with \"buildtest\" target)");
+        updateTestsButton->setToolTip("Search current RunEnv.bat/sh dir for TestDriver.py and related test executables");
 
 	testCaseFilterEdit->setPlaceholderText("Filter Test Output...");
 	testCaseFilterEdit->setClearButtonEnabled(true);
@@ -1232,7 +1232,7 @@ void MainWindowPrivate::createToolBar()
 
     addRunEnvAction = new QAction(q->style()->standardIcon(QStyle::SP_DialogOpenButton),
                                   "Add Run Environment", q);
-    addRunEnvAction->setToolTip("Add new Run Environment to automatically find & execute build tests (via buildtest target)");
+    addRunEnvAction->setToolTip("Add new Run Environment to automatically find & execute build tests");
     runEnvComboBox_->setSizeAdjustPolicy(QComboBox::AdjustToContents);
     runEnvComboBox_->setModel(runEnvModel_);
     runEnvComboBox_->setToolTip("Select current Run Environment. You can start a separate instance of gtest-runner for each environment");

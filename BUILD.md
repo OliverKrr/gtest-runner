@@ -57,7 +57,7 @@ _Make sure you've installed all the [prerequisites](#prerequisites) before proce
   * `sh make.sh`
   * you can now run `gtest-runner.exe` from the `build\RelWithDebInfo` directory!
 7. (optional) If you have `NSIS` installed, you can create the installer package and install gtest-runner into your `Program Files`.
-  * `release.sh`  
+  * `sh release.sh`  
   * `cd Release`
   * Run the installer using `gtest-runner-v[VERSION]-[TARGET].exe`, where version is the gtest-version that you downloaded, and target is win32 or win64 depending on your platform. If you're not sure what to use, type the `dir` command to see which executable was generated.
     * example: `gtest-runner-v1.4.0-win32.exe`

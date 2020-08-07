@@ -14,6 +14,7 @@
 - [Test Executable dock](#test-executable-dock)
 	- [Easily update tests](#Easily-update-tests)
 	- [Re-run test](#re-run-test)
+	- [Re-run specific Test Suite or Case](#re-run-specific-test-suite-or-case)
 	- [Kill test](#kill-test)
 	- [gtest command line options](#gtest-command-line-options)
 	- [Enable/disable autorun](#enabledisable-autorun)
@@ -40,15 +41,16 @@
 ![](resources/screenshots/screen.png)
 
 A Qt5 based automated test-runner and Graphical User Interface for our Google Test unit tests.
-The following feature list is currently not up-to-date.
 
 ## Automatic test running
 
 ![Automatic test running](resources/screenshots/feature0.png)
 
+- Enable check-box beside test executable to execute tests automatically after each build
 - Gtest-runner uses file system watchers do detect every time your test has changed (e.g. when you build it), and automatically re-runs the test and updates all the test case windows. This feature even works if you rebuild your test when gtest-runner is closed.
-- Gtest-runner runs all of your tests in parallel, showing a progress indicator for each one.
+- You can decide in `Options -> Run tests synchronous and not parallel` to run tests sequential or in parallel (per number of core). Running tests in parallel can slow down your system significantly.
 - _Note:_ for expensive or lengthy tests, automatic test running can be disabled by unchecking the box next to the test name.
+- _Note 2:_ use *Toggle auto-run* for fast switch between auto-run state for all tests.
 
 ## Simple traffic-light output
 
@@ -64,6 +66,7 @@ The following feature list is currently not up-to-date.
 ![console](resources/screenshots/console.png)
 
 - All gtest console output is reatined (including syntax highlighting) and piped to the built-in console dock, so you get all the benefits of a GUI without losing any of your debugging output. Plus, `gtest-runner` adds additional capabilities like a [search dialog](#search-failures) and [forward and backward failure navigation buttons](#nextprevious-failure).
+- _Note:_ you can enable all test output (Istd::cout, std::cerr) in `Options -> Pipe all test output to Console Output`. Some tests have a lot of console output.
 
 ## Fully customizable layout
 
@@ -98,21 +101,30 @@ The following feature list is currently not up-to-date.
 
 - Add all unit tests by selecting your `RunEnv.bat/sh`.
 - Click _Update Tests_ to update the executable list (e.g. new test targets added/build/removed)
+- You can start multiple instances of gtest-runner for each RunEnv.bat/sh dir
 
 ## Re-run test
 
 ![Re-run test](resources/screenshots/run.png)
 
-- You can manually re-run a test at any time by right-clicking on it and selecting `Run Test`
-- You can run all tests with corresponding button in tool bar (toggle `Run tests synchronous and not parallel` option to disable parallel test execution)
+- You can manually re-run a test at any time by right-clicking on it and selecting `Run Test` or with `F5`
+- You can run all tests with corresponding button in tool bar or with `F6` (toggle `Run tests synchronous and not parallel` option to disable parallel test execution)
+
+## Re-run specific Test Suite or Case
+
+![Re-run Test Case](resources/screenshots/run2.png)
+![Re-run Test Suite](resources/screenshots/run3.png)
+
+- Runs the test suite or case with a pre-defined `gtest-filter`. So that only a sub-set of tests are run
+- If you want to run all tests again, than run `AllTests` or clearing the `gtest-filter` manually next to the test executable
 
 ## Kill test
 
 ![Kill test](resources/screenshots/kill.png)
 
-- Did you just actually click run on your 4-hour CPU intensive test? No problem! Cancel a test at any time by right-clicking on it, and selecting `Kill Test`.
+- Did you just actually click run on your 4-hour CPU intensive test? No problem! Cancel a test at any time by right-clicking on it, and selecting `Kill Test` or `Shift + F5`.
 - _Hint:_ if the `Kill Test` option is grayed out, that means your test isn't running (even if it has a yellow indicator).
-- Use corresponding button in tool bar to kill all running tests
+- Use corresponding button in tool bar or `Shift + F6` to kill all running tests
 
 ## gtest command line options
 
@@ -136,7 +148,7 @@ The following feature list is currently not up-to-date.
 
 ![Path](resources/screenshots/path.png)
 
-- Mousing over any of the test executables will show the full path to the test as a tooltip. This can be useful for disambiguating multiple tests with the same name. On Windows, `Debug` and `Release` builds are differentiated automatically.
+- Mousing over any of the test executables will show the full path to the test as a tooltip. This can be useful for disambiguating multiple tests with the same name. On Windows, `Debug` and `RelWithDebInfo` builds are differentiated automatically.
 
 # Test case window
 
