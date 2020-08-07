@@ -1380,7 +1380,6 @@ void MainWindowPrivate::updateTestExecutables()
         {
             QString output = testProcess.readAllStandardOutput();
             QStringList executables = output.split(QRegExp("[\r\n]"), QString::SkipEmptyParts);
-            bool autoRun = true;
             for (const auto& testExe : executables)
             {
                 QString name = QFileInfo(testExe).baseName();
@@ -1397,11 +1396,7 @@ void MainWindowPrivate::updateTestExecutables()
                         name.append(" (MinSizeRel)");
                 }
 
-                addTestExecutable(testExe.trimmed(), name, testDriverFileInfo.absoluteFilePath(), autoRun, QDateTime());
-                // only autoRun one if we have multipl
-                // -> concurrent running of same test overwrites
-                // output test data dir of other process
-                autoRun = false;
+                addTestExecutable(testExe.trimmed(), name, testDriverFileInfo.absoluteFilePath(), false, QDateTime());
             }
         }
         else
