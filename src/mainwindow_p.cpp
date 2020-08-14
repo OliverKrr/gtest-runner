@@ -21,6 +21,7 @@
 #include <QJsonArray>
 #include <QThreadPool>
 #include <QLabel>
+#include <QProgressDialog>
 
 
 namespace
@@ -1394,16 +1395,18 @@ void MainWindowPrivate::updateTestExecutables()
 	
     QDir homeBase = QFileInfo(currentRunEnvPath_).dir();
 
-    // Temporally disable until test executables are added
-    runEnvComboBox_->setEnabled(false);
+    QProgressDialog progress("Your RunEnv.bat/sh dir is searched for all build tests.\nPlease wait till all tests are found.", "No abort possible", 0, 100, q_ptr);
+    progress.setWindowModality(Qt::WindowModal);
 
     // Remove all old and add again
     removeAllTest(true);
 
     homeBase.setNameFilters({ TEST_DRIVER_NAME });
     QDirIterator it(homeBase, QDirIterator::Subdirectories);
+    int i = 0;
     while (it.hasNext())
     {
+        progress.setValue(i++);
         QFileInfo testDriverFileInfo(it.next());
 
         // Get test executables with list-test-exess option
@@ -1441,7 +1444,7 @@ void MainWindowPrivate::updateTestExecutables()
         }
     }
 
-    runEnvComboBox_->setEnabled(true);
+    progress.setValue(progress.maximum());
 }
 
 //--------------------------------------------------------------------------------------------------
