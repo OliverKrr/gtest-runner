@@ -811,6 +811,7 @@ void MainWindowPrivate::updateButtonsForRunningTests()
         bool areAnyRunning = value != 0;
 
         addRunEnvAction->setEnabled(!areAnyRunning);
+        removeRunEnvAction_->setEnabled(!areAnyRunning);
         runEnvComboBox_->setEnabled(!areAnyRunning);
         updateTestsButton->setEnabled(!areAnyRunning);
 
@@ -988,14 +989,25 @@ void MainWindowPrivate::saveCommonSettings(const QString& path) const
     settingsFile.close();
 }
 
-void MainWindowPrivate::saveTestSettingsForCurrentRunEnv() const
+
+QString MainWindowPrivate::pathToCurrenRunEnvSettings() const
 {
     if (currentRunEnvPath_.isEmpty())
     {
-        return;
+        return "";
     }
     QString hash = QCryptographicHash::hash(currentRunEnvPath_.toLatin1(), QCryptographicHash::Md5).toHex();
-    saveTestSettings(settingsPath() + "/" + hash + ".json");
+    return settingsPath() + "/" + hash + ".json";
+}
+
+void MainWindowPrivate::saveTestSettingsForCurrentRunEnv() const
+{
+    QString path = pathToCurrenRunEnvSettings();
+    if (path.isEmpty())
+    {
+        return;
+    }
+    saveTestSettings(path);
 }
 
 void MainWindowPrivate::saveTestSettings(const QString& path) const
@@ -1088,6 +1100,7 @@ void MainWindowPrivate::loadCommonSettings(const QString& path)
     notifyOnSuccessAction->setChecked(options["notifyOnSuccess"].toBool());
     themeMenu->findChild<QAction*>(options["theme"].toString())->trigger();
     currentRunEnvPath_ = options["currentRunEnvPath"].toString();
+    removeRunEnvAction_->setEnabled(!currentRunEnvPath_.isEmpty());
 }
 
 void MainWindowPrivate::loadTestSettingsForCurrentRunEnv()
@@ -1236,6 +1249,9 @@ void MainWindowPrivate::createToolBar()
     runEnvComboBox_->setSizeAdjustPolicy(QComboBox::AdjustToContents);
     runEnvComboBox_->setModel(runEnvModel_);
     runEnvComboBox_->setToolTip("Select current Run Environment. You can start a separate instance of gtest-runner for each environment");
+    removeRunEnvAction_ = new QAction(q->style()->standardIcon(QStyle::SP_TrashIcon),
+                                  "Remove Run Environment", q);
+    removeRunEnvAction_->setToolTip("Removes current Run Environment (doesn't delete test data). If you want to remove test data, you have to do it manually.");
 
     runAllTestsAction = new QAction(q->style()->standardIcon(QStyle::SP_BrowserReload), "Run All Tests", toolBar_);
     runAllTestsAction->setShortcut(QKeySequence(Qt::Key_F6));
@@ -1247,6 +1263,7 @@ void MainWindowPrivate::createToolBar()
     toolBar_->addWidget(new QLabel("Env:", toolBar_));
     toolBar_->addAction(addRunEnvAction);
     toolBar_->addWidget(runEnvComboBox_);
+    toolBar_->addAction(removeRunEnvAction_);
     toolBar_->addSeparator();
     toolBar_->addWidget(new QLabel("All:", toolBar_));
     toolBar_->addAction(runAllTestsAction);
@@ -1278,6 +1295,7 @@ void MainWindowPrivate::createToolBar()
             saveTestSettingsForCurrentRunEnv();
             removeAllTest(true);
             currentRunEnvPath_ = runEnvPath;
+            removeRunEnvAction_->setEnabled(!currentRunEnvPath_.isEmpty());
             updateTestExecutables();
 
             if (runEnvModel_->insertRow(runEnvModel_->rowCount()))
@@ -1298,7 +1316,25 @@ void MainWindowPrivate::createToolBar()
             saveTestSettingsForCurrentRunEnv();
             removeAllTest(true);
             currentRunEnvPath_ = selectedRunEnv;
+            removeRunEnvAction_->setEnabled(!currentRunEnvPath_.isEmpty());
             loadTestSettingsForCurrentRunEnv();
+        }
+    });
+
+    connect(removeRunEnvAction_, &QAction::triggered, [this]()
+    {
+        if (QMessageBox::question(this->q_ptr, "Remove Run Env", "Do you want to remove current Run Environment?", QMessageBox::Yes, QMessageBox::No) == QMessageBox::Yes)
+        {
+            QFile(pathToCurrenRunEnvSettings()).remove();
+            removeAllTest(true);
+            currentRunEnvPath_ = "";
+            runEnvModel_->removeRow(runEnvComboBox_->currentIndex());
+            if (runEnvComboBox_->count() > 0)
+            {
+                currentRunEnvPath_ = runEnvComboBox_->currentText();
+                loadTestSettingsForCurrentRunEnv();
+            }
+            removeRunEnvAction_->setEnabled(!currentRunEnvPath_.isEmpty());
         }
     });
 
@@ -1681,6 +1717,7 @@ void MainWindowPrivate::createTestMenu()
     // Actions already created by createToolBar() -> mirror functionality
 
     testMenu->addAction(addRunEnvAction);
+    testMenu->addAction(removeRunEnvAction_);
     testMenu->addSeparator();
     testMenu->addAction(runAllTestsAction);
     testMenu->addAction(killAllTestsAction_);

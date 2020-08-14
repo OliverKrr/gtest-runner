@@ -173,6 +173,8 @@ public:
 	QMenu*									testMenu;								///< Menu for test-related actions
 
         QAction*								addRunEnvAction;							///< Opens a dialog to add a new _RunEnv
+        // Removes current RunEnv
+        QAction* removeRunEnvAction_;
         // Kills all running test
         QAction* killAllTestsAction_;																///< program options.
         QAction*								runAllTestsAction;					///< Run all tests in the list.
@@ -268,6 +270,7 @@ protected:
         void killAllTest(const bool confirm = false);
 
         void saveCommonSettings(const QString& path) const;
+        QString pathToCurrenRunEnvSettings() const;
         void saveTestSettingsForCurrentRunEnv() const;
         void saveTestSettings(const QString& path) const;
         void loadCommonSettings(const QString& path);
