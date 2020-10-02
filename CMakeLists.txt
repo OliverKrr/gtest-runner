@@ -123,7 +123,7 @@ src/executableModelDelegate.h
 src/executableSettingsDialog.h
 src/domitem.h
 src/GTestFailureModel.h
-src/gtestmodel.h
+src/gtestModel.h
 src/qexecutablemodel.h
 src/qexecutabletreeview.h
 src/QBottomUpSortFilterProxy.h
@@ -158,10 +158,7 @@ src/qtfindreplacedialog/findreplacedialog.cpp
 src/qtfindreplacedialog/findreplaceform.cpp
 )
 
-# on windows, append headers to source so they show up in visual studio
-if(WIN32)
-	LIST(APPEND SOURCE_FILES ${HEADER_FILES})
-endif()
+LIST(APPEND SOURCE_FILES ${HEADER_FILES})
 
 #-------------------------------------------------------------------------------
 #	SOURCE GROUPS

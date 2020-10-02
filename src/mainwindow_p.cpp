@@ -23,6 +23,11 @@
 #include <QLabel>
 #include <QProgressDialog>
 
+#ifndef Q_OS_WIN32
+#define PYTHON "python3"
+#else
+#define PYTHON "py"
+#endif
 
 namespace
 {
@@ -743,18 +748,19 @@ void MainWindowPrivate::runTestInThread(const QString& pathToTest, bool notify)
 		QString otherArgs = executableModel->data(index, QExecutableModel::ArgsRole).toString();
 		if(!otherArgs.isEmpty()) arguments << otherArgs;
 
-
-                QString cmd = "\"" + currentRunEnvPath_ + "\" && py";
-#ifndef Q_OS_WIN32
-                cmd = "./" + cmd;
-#endif
-
-		// Start the test
+#ifdef Q_OS_WIN32
+                QString cmd = "\"" + currentRunEnvPath_ + "\" && " PYTHON;
+                // Start the test
                 testProcess.start(cmd, arguments);
+#else
+                QString cmd = "bash -c \"source " + currentRunEnvPath_ + "; " PYTHON " " + arguments.join(" ") +  "\"";
+                // Start the test
+                testProcess.start(cmd);
+#endif
 
 		// get the first line of output. If we don't get it in a timely manner, the test is
 		// probably bugged out so kill it.
-		if (!testProcess.waitForReadyRead(500))
+		if (!testProcess.waitForReadyRead(2000))
 		{
 			testProcess.kill();
 
@@ -1274,8 +1280,8 @@ void MainWindowPrivate::createToolBar()
 
     connect(addRunEnvAction, &QAction::triggered, [this]()
     {
-        QString filter = "RunEnv (*.bat *.sh)";
-        QString caption = "Select RunEnv.bat or RunEnv.sh";
+    	QString filter = "RunEnv (*.bat *.sh)";
+    	QString caption = "Select RunEnv.bat or RunEnv.sh";
         QString filename = QFileDialog::getOpenFileName(q_ptr, caption, currentRunEnvPath_, filter);
 
         if (filename.isEmpty())
@@ -1392,7 +1398,7 @@ void MainWindowPrivate::updateTestExecutables()
     {
         return;
     }
-	
+
     QDir homeBase = QFileInfo(currentRunEnvPath_).dir();
 
     QProgressDialog progress("Your RunEnv.bat/sh dir is searched for all build tests.\nPlease wait till all tests are found.", "No abort possible", 0, 100, q_ptr);
@@ -1413,7 +1419,7 @@ void MainWindowPrivate::updateTestExecutables()
         QProcess testProcess;
         QStringList arguments(testDriverFileInfo.absoluteFilePath());
         arguments << "--list-test-exes";
-        testProcess.start("py", arguments);
+        testProcess.start(PYTHON, arguments);
 
         if (testProcess.waitForFinished(500))
         {
@@ -1531,7 +1537,7 @@ void MainWindowPrivate::createExecutableContextMenu()
             QString path = executableTreeView->currentIndex().data(QExecutableModel::PathRole).toString();
             QDesktopServices::openUrl(QUrl::fromLocalFile(xmlPath(path)));
         });
-
+	
 	connect(removeTestAction, &QAction::triggered, [this]
 	{
 		removeTest(executableTreeView->currentIndex());

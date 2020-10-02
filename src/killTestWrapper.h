@@ -66,4 +66,4 @@ signals:
     void killTest();
 };
 
-#endif killtestwrapper_p_h__
+#endif // killtestwrapper_p_h__
