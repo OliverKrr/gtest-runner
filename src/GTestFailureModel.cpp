@@ -23,7 +23,7 @@ GTestFailureModel::~GTestFailureModel()
 
 int GTestFailureModel::columnCount(const QModelIndex &/*parent*/) const
 {
-	return 8;
+    return 9;
 }
 
 QVariant GTestFailureModel::data(const QModelIndex &index, int role) const
@@ -112,6 +112,8 @@ QVariant GTestFailureModel::data(const QModelIndex &index, int role) const
 		case 7:
 			nearMatch = nearrx.match(message);
 			return nearMatch.captured(10);
+                case 8:
+                    return message;
 		default:
 			return QVariant();
 		}
@@ -170,6 +172,8 @@ QVariant GTestFailureModel::headerData(int section, Qt::Orientation orientation,
 			return tr("Difference");
 		case 7:
 			return tr("Tolerance");
+                case 8:
+                        return tr("Message");
 		default:
 			return QVariant();
 		}

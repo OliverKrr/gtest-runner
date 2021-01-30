@@ -81,7 +81,7 @@ MainWindowPrivate::MainWindowPrivate(QStringList tests, bool reset, MainWindow* 
 	statusBar(new QStatusBar(q)),
 	failureDock(new QDockWidget(q)),
 	failureTreeView(new QTreeView(q)),
-	failureProxyModel(new QBottomUpSortFilterProxy(q)),
+        failureProxyModel(new QFilterEmptyColumnProxy(q)),
 	consoleDock(new QDockWidget(q)),
 	consoleTextEdit(new QTextEdit(q)),
 	consoleFrame(new QFrame(q)),

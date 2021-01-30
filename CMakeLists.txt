@@ -127,6 +127,7 @@ src/gtestModel.h
 src/qexecutablemodel.h
 src/qexecutabletreeview.h
 src/QBottomUpSortFilterProxy.h
+src/QFilterEmptyColumnProxy.h
 src/QStdOutSyntaxHighlighter.h
 src/tree.h
 src/QTreeModel.h
@@ -152,6 +153,7 @@ src/gtestModel.cpp
 src/qexecutablemodel.cpp
 src/qexecutabletreeview.cpp
 src/QBottomUpSortFilterProxy.cpp
+src/QFilterEmptyColumnProxy.cpp
 src/qtfindreplacedialog/finddialog.cpp
 src/qtfindreplacedialog/findform.cpp
 src/qtfindreplacedialog/findreplacedialog.cpp

@@ -44,6 +44,7 @@
 #include "mainwindow.h"
 #include "qexecutablemodel.h"
 #include "QBottomUpSortFilterProxy.h"
+#include "QFilterEmptyColumnProxy.h"
 #include "qexecutabletreeview.h"
 #include "QStdOutSyntaxHighlighter.h"
 #include "appinfo.h"
@@ -133,7 +134,7 @@ public:
 
 	QDockWidget*							failureDock;							///< Dock widget for reporting failures.
 	QTreeView*								failureTreeView;						///< Tree view for failures.
-	QBottomUpSortFilterProxy*				failureProxyModel;						///< Proxy model for sorting failures.
+        QFilterEmptyColumnProxy*				failureProxyModel;						///< Proxy model for sorting failures.
 
 	QStatusBar*								statusBar;								///< status
 
