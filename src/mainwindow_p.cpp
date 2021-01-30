@@ -213,7 +213,7 @@ MainWindowPrivate::MainWindowPrivate(QStringList tests, bool reset, MainWindow* 
 
         connect(toggleAutoRun_, &QPushButton::clicked, [this]()
         {
-            for (size_t i = 0; i < executableModel->rowCount(); ++i)
+            for (int i = 0; i < executableModel->rowCount(); ++i)
             {
                 auto index = executableModel->index(i, 0);
                 QString path = index.data(QExecutableModel::PathRole).toString();
@@ -1165,7 +1165,7 @@ void MainWindowPrivate::removeAllTest(const bool confirm)
 
     if (confirm || QMessageBox::question(this->q_ptr, "Remove All Test?", "Do you want to remove all tests?", QMessageBox::Yes, QMessageBox::No) == QMessageBox::Yes)
     {
-        for (size_t i = 0; i < executableModel->rowCount(); ++i)
+        for (int i = 0; i < executableModel->rowCount(); ++i)
         {
             auto index = executableModel->index(i, 0);
             QString path = index.data(QExecutableModel::PathRole).toString();
@@ -1347,7 +1347,7 @@ void MainWindowPrivate::createToolBar()
 
     connect(runAllTestsAction, &QAction::triggered, [this]
     {
-        for (size_t i = 0; i < executableTreeView->model()->rowCount(); ++i)
+        for (int i = 0; i < executableTreeView->model()->rowCount(); ++i)
         {
             QModelIndex index = executableTreeView->model()->index(i, 0);
             runTestInThread(index.data(QExecutableModel::PathRole).toString(), false);
@@ -1374,7 +1374,7 @@ void MainWindowPrivate::killAllTest(const bool confirm)
 {
     if (confirm || QMessageBox::question(this->q_ptr, "Kill All Test?", "Are you sure you want to kill all test?", QMessageBox::Yes, QMessageBox::No) == QMessageBox::Yes)
     {
-        for (size_t i = 0; i < executableTreeView->model()->rowCount(); ++i)
+        for (int i = 0; i < executableTreeView->model()->rowCount(); ++i)
         {
             QModelIndex index = executableTreeView->model()->index(i, 0);
             emitKillTest(index.data(QExecutableModel::PathRole).toString());
