@@ -9,7 +9,7 @@ set(QT_MINIMUM_VERSION 5.3.0)
 #	PROJECT SETTINGS
 #-------------------------------------------------------------------------------
 
-set(TARGET_NAME gtest-runner)
+project(gtest-runner C CXX)
 
 # Use git tag as project name if clones from git
 find_package(Git)
@@ -28,13 +28,8 @@ if(GIT_FOUND)
 	  OUTPUT_VARIABLE VERSION
 	  OUTPUT_STRIP_TRAILING_WHITESPACE
 	)
-	set(PROJECT_NAME ${TARGET_NAME}-${BRANCH})
-else()
-	set(PROJECT_NAME ${TARGET_NAME})
 endif()
 
-# Set the project name
-PROJECT(${PROJECT_NAME})
 
 #-------------------------------------------------------------------------------
 #	CMake Modules
@@ -99,7 +94,7 @@ endif(MSVC)
 #	CONFIGURATION
 #-------------------------------------------------------------------------------
 
-set(APPLICATION_NAME ${TARGET_NAME})
+set(APPLICATION_NAME ${PROJECT_NAME})
 set(APPLICATION_VERSION ${VERSION})
 set(APPLICATION_ORGANIZATION "OliverKrr")
 set(APPLICATION_ORGANIZATION_DOMAIN "https://github.com/OliverKrr/gtest-runner")
@@ -230,18 +225,18 @@ list(REMOVE_DUPLICATES LIBRARIES)
 include_directories(${INCLUDE_DIRS})
 
 # Generate the executable
-add_executable(${TARGET_NAME} ${GUI_TYPE} ${SOURCE_FILES} ${UI_HDRS} ${RESOURCES})
+add_executable(${PROJECT_NAME} ${GUI_TYPE} ${SOURCE_FILES} ${UI_HDRS} ${RESOURCES})
 
 # link libraries
-target_link_libraries(${TARGET_NAME} ${LIBRARIES})
+target_link_libraries(${PROJECT_NAME} ${LIBRARIES})
 
 # Use the automatically determined RPATH values
-set_target_properties(${TARGET_NAME} PROPERTIES INSTALL_RPATH_USE_LINK_PATH TRUE)
+set_target_properties(${PROJECT_NAME} PROPERTIES INSTALL_RPATH_USE_LINK_PATH TRUE)
 
 if (APPLE)
-  INSTALL(TARGETS ${TARGET_NAME} BUNDLE DESTINATION bin)
+  INSTALL(TARGETS ${PROJECT_NAME} BUNDLE DESTINATION bin)
 else()
-  INSTALL(TARGETS ${TARGET_NAME} RUNTIME DESTINATION bin)
+  INSTALL(TARGETS ${PROJECT_NAME} RUNTIME DESTINATION bin)
 endif()
 INSTALL(FILES ${CMAKE_SOURCE_DIR}/resources/desktop/gtest-runner.desktop DESTINATION share/applications)
 INSTALL(FILES ${CMAKE_SOURCE_DIR}/resources/desktop/gtest-runner.png DESTINATION share/icons)
@@ -251,8 +246,8 @@ INCLUDE(InstallRequiredSystemLibraries)
 if(WIN32)
 	# Run winddeployqt if it can be found
 	find_program(WINDEPLOYQT_EXECUTABLE NAMES windeployqt HINTS ${QTDIR} ENV QTDIR PATH_SUFFIXES bin)
-	add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
-	COMMAND ${WINDEPLOYQT_EXECUTABLE} $<TARGET_FILE:${TARGET_NAME}>)
+	add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+	COMMAND ${WINDEPLOYQT_EXECUTABLE} $<TARGET_FILE:${PROJECT_NAME}>)
 	# Gather up all the dependencies in the bin dir
 	# Lack of a trailing slash means install this directory, trailing slash means install everything in this directory.
 	install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/Release/
@@ -268,10 +263,10 @@ if(WIN32)
 	set(CPACK_GENERATOR "NSIS;ZIP")
 	SET(CPACK_NSIS_URL_INFO_ABOUT ${APPLICATION_ORGANIZATION_DOMAIN})
 	set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL ON)
-	SET(CPACK_NSIS_INSTALLED_ICON_NAME "bin\\\\$<TARGET_FILE:${TARGET_NAME}>")
+	SET(CPACK_NSIS_INSTALLED_ICON_NAME "bin\\\\$<TARGET_FILE:${PROJECT_NAME}>")
 	SET(CPACK_NSIS_MUI_ICON ${PROJECT_SOURCE_DIR}/resources/icons\\\\logo.ico)
-	SET(CPACK_NSIS_DISPLAY_NAME "${TARGET_NAME}")
-	SET(CPACK_NSIS_MUI_FINISHPAGE_RUN ${TARGET_NAME}.exe)
+	SET(CPACK_NSIS_DISPLAY_NAME "${PROJECT_NAME}")
+	SET(CPACK_NSIS_MUI_FINISHPAGE_RUN ${PROJECT_NAME}.exe)
 	set(CPACK_PACKAGE_ICON ${PROJECT_SOURCE_DIR}/resources/images\\\\logo.bmp)
 	set(CPACK_PACKAGE_VERSION ${VERSION})
 else(WIN32)
@@ -292,8 +287,8 @@ SET(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
 
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "GTest-Runner - an automated test runner and user interface for google tests")
 
-SET(CPACK_PACKAGE_INSTALL_DIRECTORY "${TARGET_NAME}")
+SET(CPACK_PACKAGE_INSTALL_DIRECTORY "${PROJECT_NAME}")
 set(CPACK_PACKAGE_DIRECTORY ${PROJECT_BINARY_DIR}/Release)
-set(CPACK_PACKAGE_EXECUTABLES "${TARGET_NAME}" "gtest-runner")
+set(CPACK_PACKAGE_EXECUTABLES "${PROJECT_NAME}" "gtest-runner")
 
 INCLUDE(CPack)
