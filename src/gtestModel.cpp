@@ -4,243 +4,279 @@
 #include <QIcon>
 #include <QtXml>
 
-GTestModel::GTestModel(const QDomDocument& document, QObject *parent)
-	: QAbstractItemModel(parent), domDocument(document), grayIcon(":/images/gray"),
-	greenIcon(":/images/green"), yellowIcon(":/images/yellow"), redIcon(":/images/red")
+GTestModel::GTestModel(QDomDocument overviewDocuement, QObject* parent)
+    : QAbstractTableModel(parent), overviewModel_(initModel(overviewDocuement, overviewDocuement)),
+    grayIcon(":/images/gray"), greenIcon(":/images/green"),
+    yellowIcon(":/images/yellow"), redIcon(":/images/red")
 {
-	removeComments(domDocument);
-	rootItem = new DomItem(domDocument, 0);
+
 }
 
-GTestModel::~GTestModel()
+void GTestModel::addTestResult(int index, QDomDocument document)
 {
-	delete rootItem;
+    if (index < 0 || index > testResults_.size())
+    {
+        return;
+    }
+
+    auto pos = testResults_.begin() + index;
+    ModelPtr model = initModel(document, overviewModel_->document_);
+    testResults_.insert(pos, model);
 }
 
-int GTestModel::columnCount(const QModelIndex &/*parent*/) const
+void GTestModel::removeTestResult(const int index)
 {
-	return Last;
+    if (index < 0 || index >= testResults_.size())
+    {
+        return;
+    }
+    auto pos = testResults_.begin() + index;
+    testResults_.erase(pos);
 }
 
-QVariant GTestModel::data(const QModelIndex &index, const int role) const
+
+int GTestModel::columnCount(const QModelIndex& /*parent*/) const
 {
-	if (!index.isValid())
-		return QVariant();
-
-	const DomItem *item = static_cast<DomItem*>(index.internalPointer());
-
-	const QDomNode node = item->node();
-	QStringList attributes;
-	const QDomNamedNodeMap attributeMap = node.attributes();
-
-	switch(role)
-	{
-	case Qt::DisplayRole:
-		switch (index.column())
-		{
-                case Name:
-                {
-                    QString name = attributeMap.namedItem("name").nodeValue();
-                    if (attributeMap.contains("value_param"))
-                    {
-                        name += " (" + attributeMap.namedItem("value_param").nodeValue() + ")";
-                    }
-                    return name;
-                }
-		case TestNumber:
-			return item->row();
-		case Failures:
-			if (attributeMap.namedItem("failures").isNull())
-				return node.childNodes().count();
-			else
-				return attributeMap.namedItem("failures").nodeValue();
-		case Time:
-			return attributeMap.namedItem("time").nodeValue().toDouble() * 1000;
-		case Tests:
-			return attributeMap.namedItem("tests").nodeValue();
-		case Errors:
-			return attributeMap.namedItem("errors").nodeValue();
-		case Disabled:
-			return attributeMap.namedItem("disabled").nodeValue();
-		case Timestamp:
-			return attributeMap.namedItem("timestamp").nodeValue();
-		default:
-			return QVariant();
-		}
-		break;
-	case Qt::DecorationRole:
-		if (index.column() == 0)
-		{
-			if (attributeMap.namedItem("status").nodeValue().contains("notrun"))
-				return grayIcon;
-			if (attributeMap.namedItem("result").nodeValue().contains("skipped"))
-				return grayIcon;
-			if (!attributeMap.namedItem("failures").isNull())
-			{
-				if (attributeMap.namedItem("failures").nodeValue().toInt() > 0)
-					return redIcon;
-				else
-					return greenIcon;
-			}
-			else
-			{
-				if (node.childNodes().count())
-					return redIcon;
-				else
-					return greenIcon;
-			}
-		}
-		break;
-	case Qt::TextAlignmentRole:
-		switch (index.column())
-		{
-		case Name:
-			return Qt::AlignLeft;
-		case TestNumber:
-			return Qt::AlignCenter;
-		case Failures:
-			return Qt::AlignCenter;
-		case Time:
-			return Qt::AlignCenter;
-		case Tests:
-			return Qt::AlignCenter;
-		case Errors:
-			return Qt::AlignCenter;
-		case Disabled:
-			return Qt::AlignCenter;
-		case Timestamp:
-			return Qt::AlignLeft;
-		default:
-			return Qt::AlignLeft;
-		}
-	case FailureRole:
-		return data(this->index(index.row(), Failures, index.parent()), Qt::DisplayRole);
-	default:
-		return QVariant();
-	}
-
-	return QVariant();
+    return 2 + testResults_.size();
 }
 
-Qt::ItemFlags GTestModel::flags(const QModelIndex &index) const
+QVariant GTestModel::data(const QModelIndex& index, int role) const
 {
-	if (!index.isValid())
-		return 0;
+    FlatDomeItemPtr item = itemForIndex(index);
+    if (!item)
+    {
+        return QVariant();
+    }
 
-	switch (index.column())
-	{
-	case Name:
-	default:
-		return QAbstractItemModel::flags(index);;
-	}
+    const QDomNode& node = item->node();
+    QDomNamedNodeMap attributeMap = node.attributes();
+
+    switch (role)
+    {
+    case Qt::DisplayRole:
+        switch (sectionForColumn(index.column()))
+        {
+        case TestNumber:
+            if (item->row() > 0)
+            {
+                return item->row();
+            }
+            return QVariant();
+        case Name:
+        {
+            QString name = attributeMap.namedItem("name").nodeValue();
+            if (attributeMap.contains("value_param"))
+            {
+                name += " (" + attributeMap.namedItem("value_param").nodeValue() + ")";
+            }
+            return indent(item->level()) + name;
+        }
+        case ResultAndTime:
+        {
+            QString result;
+            QString failures = attributeMap.namedItem("failures").nodeValue();
+            QString tests = attributeMap.namedItem("tests").nodeValue();
+            if (!failures.isEmpty() || !tests.isEmpty())
+            {
+                result += failures + "/" + tests + reverseIndent(item->level());
+            }
+            result += QString::number(attributeMap.namedItem("time").nodeValue().toDouble(), 'f', 3);
+            return result;
+        }
+        default:
+            return QVariant();
+        }
+        break;
+    case Qt::DecorationRole:
+        if (index.column() >= 2)
+        {
+            if (attributeMap.namedItem("status").nodeValue().contains("notrun"))
+                return grayIcon;
+            if (!attributeMap.namedItem("failures").isNull())
+            {
+                if (attributeMap.namedItem("failures").nodeValue().toInt() > 0)
+                    return redIcon;
+                else
+                    return greenIcon;
+            }
+            else
+            {
+                if (node.childNodes().count())
+                    return redIcon;
+                else
+                    return greenIcon;
+            }
+        }
+        break;
+    case Qt::TextAlignmentRole:
+        switch (sectionForColumn(index.column()))
+        {
+        case TestNumber:
+            return Qt::AlignCenter;
+        case Name:
+            return Qt::AlignLeft;
+        case ResultAndTime:
+            return Qt::AlignRight;
+        default:
+            return Qt::AlignLeft;
+        }
+        break;
+    case FailureRole:
+    {
+        if (attributeMap.namedItem("failures").isNull())
+            return node.childNodes().count();
+        else
+            return attributeMap.namedItem("failures").nodeValue();
+    }
+    default:
+        return QVariant();
+    }
+
+    return QVariant();
 }
 
-QVariant GTestModel::headerData(const int section, const Qt::Orientation orientation,
-                                const int role) const
+QVariant GTestModel::headerData(int section, Qt::Orientation orientation,
+                                int role) const
 {
-	if (orientation == Qt::Horizontal && role == Qt::DisplayRole) {
-		switch (section) {
-		case Name:
-			return tr("Name");
-		case TestNumber:
-			return tr("Test #");
-		case Failures:
-			return tr("Failures");
-		case Time:
-			return tr("Time (ms)");
-		case Tests:
-			return tr("Tests");
-		case Errors:
-			return tr("Errors");
-		case Disabled:
-			return tr("Disabled");
-		case Timestamp:
-			return tr("Timestamp");
-		default:
-			return QVariant();
-		}
-	}
-
-	return QVariant();
+    if (orientation == Qt::Horizontal && role == Qt::DisplayRole)
+    {
+        switch (sectionForColumn(section))
+        {
+        case TestNumber:
+            return tr("Test #");
+        case Name:
+            return tr("Name");
+        case ResultAndTime:
+        {
+            return timestampForColumn(section);
+            break;
+        }
+        default:
+            return QVariant();
+        }
+    }
+    return QVariant();
 }
 
-QModelIndex GTestModel::index(const int row, const int column, const QModelIndex &parent)
-const
+int GTestModel::rowCount(const QModelIndex& parent) const
 {
-	if (!hasIndex(row, column, parent))
-		return QModelIndex();
-
-	DomItem *parentItem;
-
-	if (!parent.isValid())
-		parentItem = rootItem;
-	else
-		parentItem = static_cast<DomItem*>(parent.internalPointer());
-
-	DomItem *childItem = parentItem->child(row);
-	if (childItem)
-		return createIndex(row, column, childItem);
-	else
-		return QModelIndex();
+    return overviewModel_->domeItemHandler_.numberItems();
 }
 
-QModelIndex GTestModel::parent(const QModelIndex &child) const
+GTestModel::ModelPtr GTestModel::modelForColumn(const int column) const
 {
-	if (!child.isValid())
-		return QModelIndex();
-
-	const DomItem *childItem = static_cast<DomItem*>(child.internalPointer());
-	DomItem *parentItem = childItem->parent();
-
-	if (!parentItem || parentItem == rootItem)
-		return QModelIndex();
-
-	return createIndex(parentItem->row(), 0, parentItem);
+    if (column == 0 || column == 1)
+    {
+        return overviewModel_;
+    }
+    else if (column - 2 < testResults_.size())
+    {
+        return testResults_[column - 2];
+    }
+    return nullptr;
 }
 
-int GTestModel::rowCount(const QModelIndex &parent) const
+FlatDomeItemPtr GTestModel::itemForIndex(const QModelIndex& index) const
 {
-	if (parent.column() > 0)
-		return 0;
-
-	DomItem *parentItem;
-
-	if (!parent.isValid())
-		parentItem = rootItem;
-	else
-		parentItem = static_cast<DomItem*>(parent.internalPointer());
-
-	const auto& firstChildNodeName = parentItem->node().toElement().firstChild().nodeName();
-	// don't show failure/skipped nodes in the test model. They'll go in a separate model.
-	if (firstChildNodeName == "failure" || firstChildNodeName == "skipped")
-		return 0;
-
-	return parentItem->node().childNodes().count();
+    if (!index.isValid())
+    {
+        return nullptr;
+    }
+    ModelPtr model = modelForColumn(index.column());
+    if (!model)
+    {
+        return nullptr;
+    }
+    return model->domeItemHandler_.item(index.row());
 }
 
-void GTestModel::removeComments(QDomNode &node)
+GTestModel::Sections GTestModel::sectionForColumn(const int column) const
 {
-	if (node.hasChildNodes())
-	{
-		// call remove comments recursively on all the child nodes
-		// iterate backwards because once a node is removed, the
-		// remaining nodes shift down in index, meaning iterating
-		// forward would skip over some.
-		for (int i = node.childNodes().count() - 1; i >= 0; i--)
-		{
-			QDomNode child = node.childNodes().at(i);
-			// Uh-oh, recursion!!
-			removeComments(child);
-		}
-	}
-	else
-	{
-		// if the node has no children, check if it's a comment
-		if (node.nodeType() == QDomNode::ProcessingInstructionNode ||
-			node.nodeType() == QDomNode::CommentNode)
-		{
-			// if so, get rid of it.
-			node.parentNode().removeChild(node);
-		}
-	}
+    if (column == 0)
+    {
+        return TestNumber;
+    }
+    else if (column == 1)
+    {
+        return Name;
+    }
+    return ResultAndTime;
 }
+
+QString GTestModel::timestampForColumn(const int column) const
+{
+    ModelPtr model = modelForColumn(column);
+    if (model)
+    {
+        FlatDomeItemPtr item = model->domeItemHandler_.item(0);
+        if (item)
+        {
+            QString timestamp = item->node().attributes().namedItem("timestamp").nodeValue();
+            int splitPos = timestamp.indexOf("T");
+            return timestamp.left(splitPos) + " " + timestamp.right(timestamp.length() - splitPos - 1);
+        }
+    }
+    return QString();
+}
+
+QString GTestModel::indent(const int level) const
+{
+    QString result;
+    for (int i = 0; i < level; ++i)
+    {
+        result += "    ";
+    }
+    return result;
+}
+
+QString GTestModel::reverseIndent(const int level) const
+{
+    QString result;
+    for (int i = level; i < 2; ++i)
+    {
+        result += "    ";
+    }
+    return result;
+}
+
+
+GTestModel::ModelPtr GTestModel::initModel(QDomDocument& document, const QDomDocument& overviewDocuement) const
+{
+    removeComments(document);
+    FlatDomeItemHandler domeItemHandler = FlatDomeItemHandler(document, overviewDocuement, std::bind(&GTestModel::isFailure, this, std::placeholders::_1));
+    return std::make_shared<Model>(document, domeItemHandler);
+}
+
+void GTestModel::removeComments(QDomNode& node) const
+{
+    if (node.hasChildNodes())
+    {
+        // call remove comments recursively on all the child nodes
+        // iterate backwards because once a node is removed, the
+        // remaining nodes shift down in index, meaning iterating
+        // forward would skip over some.
+        for (int i = node.childNodes().count() - 1; i >= 0; i--)
+        {
+            QDomNode child = node.childNodes().at(i);
+            // Uh-oh, recursion!!
+            removeComments(child);
+        }
+    }
+    else
+    {
+        // if the node has no children, check if it's a comment
+        if (node.nodeType() == QDomNode::ProcessingInstructionNode ||
+            node.nodeType() == QDomNode::CommentNode)
+        {
+            // if so, get rid of it.
+            node.parentNode().removeChild(node);
+        }
+    }
+}
+
+bool GTestModel::isFailure(const QDomNode& node) const
+{
+    // don't show failure/skipped nodes in the test model. They'll go in a separate model.
+    return node.nodeName() != "failure" && node.nodeName() != "skipped";
+}
+

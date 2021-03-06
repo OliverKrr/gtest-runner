@@ -71,6 +71,7 @@
 #include <QSystemTrayIcon>
 #include <QTextEdit>
 #include <QTreeView>
+#include <QTableView>
 #include <QToolBar>
 #include <QStringListModel>
 #include <QComboBox>
@@ -111,8 +112,8 @@ public:
 
 	QFrame*									centralFrame;							///< Central widget frame.
 	QLineEdit*								testCaseFilterEdit;						///< Line edit for filtering test cases.
-	QTreeView*								testCaseTreeView;						///< Tree view where the test results are displayed.
-	QBottomUpSortFilterProxy*				testCaseProxyModel;						///< Sort/filter proxy for the test-case mode.
+	QTableView*								testCaseTableView;						///< Table view where the overall test overview is displayed.
+        QSortFilterProxyModel*				testCaseProxyModel;						///< Sort/filter proxy for the test-case mode.
 
 	QDockWidget*							failureDock;							///< Dock widget for reporting failures.
 	QTreeView*								failureTreeView;						///< Tree view for failures.
@@ -163,10 +164,8 @@ public:
         QAction*								runAllTestsAction;					///< Run all tests in the list.
 
 	QMenu*									testCaseViewContextMenu;				///< Context menu for the test case tree view
-	QAction*								testCaseViewExpandAllAction;			///< expands all nodes in the test case tree view
         // Action to set gtest filter and run only the specific test
         QAction* testCaseViewRunTestCaseAction_;
-	QAction*								testCaseViewCollapseAllAction;			///< Collapses all nodes in the test case tree view.
 
 	QMenu*									consoleContextMenu;						///< Context menu for the console dock;
 	QShortcut*								consoleFindShortcut;					///< Global Ctrl-F to activate the find dialog.

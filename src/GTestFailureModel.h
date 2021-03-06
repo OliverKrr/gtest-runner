@@ -37,6 +37,8 @@
 
 #pragma once
 
+#include "flatDomeItem.h"
+
 #include <QIcon>
 #include <QModelIndex>
 
@@ -55,7 +57,7 @@ public:
 		MessageRole = Qt::UserRole + 2,
 	};
 
-	explicit GTestFailureModel(const DomItem* root, QObject *parent = nullptr);
+    explicit GTestFailureModel(FlatDomeItemPtr root, QObject *parent = nullptr);
 	~GTestFailureModel() override;
 
 	QVariant data(const QModelIndex &index, int role) const Q_DECL_OVERRIDE;

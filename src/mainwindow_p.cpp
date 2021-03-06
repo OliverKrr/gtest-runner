@@ -70,13 +70,14 @@ MainWindowPrivate::MainWindowPrivate(const QStringList&, const bool reset, MainW
 	executableDockFrame(new QFrame(q)),
 	executableTreeView(new QExecutableTreeView(q)),
 	executableModel(new QExecutableModel(q)),
-	updateTestsButton(new QPushButton(q)),
+        testCaseProxyModel(new QSortFilterProxyModel(q)),
+        updateTestsButton(new QPushButton(q)),
         toggleAutoRun_(new QPushButton(q)),
         fileWatcher(new QFileSystemWatcher(q)),
 	centralFrame(new QFrame(q)),
 	testCaseFilterEdit(new QLineEdit(q)),
-	testCaseTreeView(new QTreeView(q)),
-	testCaseProxyModel(new QBottomUpSortFilterProxy(q)),
+        testCaseTableView(new QTableView(q)),
+	statusBar(new QStatusBar(q)),
 	failureDock(new QDockWidget(q)),
 	failureTreeView(new QTreeView(q)),
 	failureProxyModel(new QFilterEmptyColumnProxy(q)),
@@ -107,7 +108,7 @@ MainWindowPrivate::MainWindowPrivate(const QStringList&, const bool reset, MainW
 
 	centralFrame->setLayout(new QVBoxLayout);
 	centralFrame->layout()->addWidget(testCaseFilterEdit);
-	centralFrame->layout()->addWidget(testCaseTreeView);
+        centralFrame->layout()->addWidget(testCaseTableView);
 	centralFrame->layout()->setContentsMargins(0, 5, 0, 0);
 
 	executableDock->setObjectName("executableDock");
@@ -138,11 +139,17 @@ MainWindowPrivate::MainWindowPrivate(const QStringList&, const bool reset, MainW
 	testCaseFilterEdit->setPlaceholderText("Filter Test Output...");
 	testCaseFilterEdit->setClearButtonEnabled(true);
 
-	testCaseTreeView->setSortingEnabled(true);
-	testCaseTreeView->sortByColumn(GTestModel::TestNumber, Qt::AscendingOrder);
-	testCaseTreeView->setModel(testCaseProxyModel);
-	testCaseTreeView->setSelectionMode(QAbstractItemView::ExtendedSelection);
-	testCaseTreeView->setSelectionBehavior(QAbstractItemView::SelectRows);
+        // TODO: disable sorting for now -> need to ensure that "TestAll/Suite" doesn't get mixed up
+	testCaseTableView->setSortingEnabled(false);
+	//testCaseTableView->sortByColumn(GTestModel::TestNumber, Qt::AscendingOrder);
+        testCaseTableView->setSelectionMode(QAbstractItemView::ExtendedSelection);
+		testCaseTableView->setSelectionBehavior(QAbstractItemView::SelectRows);
+        testCaseTableView->setWordWrap(false);
+        // TODO
+        //testCaseTableView->setFixedHeight();
+        testCaseTableView->verticalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
+        testCaseTableView->setTextElideMode(Qt::ElideMiddle);
+        testCaseTableView->setModel(testCaseProxyModel);
 
 	testCaseProxyModel->setFilterCaseSensitivity(Qt::CaseInsensitive);
 
@@ -323,23 +330,23 @@ MainWindowPrivate::MainWindowPrivate(const QStringList&, const bool reset, MainW
 			testCaseProxyModel->setFilterRegExp(text);
 			if(testCaseProxyModel->rowCount())
 			{
-				testCaseTreeView->expandAll();
 				for (int i = 0; i < testCaseProxyModel->columnCount(); ++i)
 				{
-					testCaseTreeView->resizeColumnToContents(i);
+					testCaseTableView->resizeColumnToContents(i);
 				}
 			}
 		}
 	});
 
 	// create a failure model when a test is clicked
-	connect(testCaseTreeView->selectionModel(), &QItemSelectionModel::selectionChanged, [this](const QItemSelection& selected, const QItemSelection& deselected)
+	connect(testCaseTableView->selectionModel(), &QItemSelectionModel::selectionChanged, [this](const QItemSelection& selected, const QItemSelection& deselected)
 	{
 		if (selected.indexes().empty())
 			return;
 
-		const auto index = testCaseProxyModel->mapToSource(selected.indexes().first());
-		const auto item = static_cast<DomItem*>(index.internalPointer());
+                auto index = testCaseProxyModel->mapToSource(selected.indexes().first());
+                //TODO: check if works with history
+                FlatDomeItemPtr item = static_cast<GTestModel*>(testCaseProxyModel->sourceModel())->itemForIndex(index);
 
 		if (index.isValid())
 		{
@@ -360,7 +367,7 @@ MainWindowPrivate::MainWindowPrivate(const QStringList&, const bool reset, MainW
 	});
 
 	// open failure dock on test double-click
-	connect(testCaseTreeView, &QTreeView::doubleClicked, [this](const QModelIndex& index)
+        connect(testCaseTableView, &QTableView::doubleClicked, [this](const QModelIndex& index)
 	{
 		if (index.isValid())
 			failureDock->show();
@@ -368,7 +375,7 @@ MainWindowPrivate::MainWindowPrivate(const QStringList&, const bool reset, MainW
 
 	// copy failure line to clipboard (to support IDE Ctrl-G + Ctrl-V)
 	// also, highlight it in the console model
-	connect(failureTreeView, &QTreeView::clicked, [this](const QModelIndex& index)
+        connect(failureTreeView, &QTableView::clicked, [this](const QModelIndex& index)
 	{
 		if (index.isValid())
 		{
@@ -386,7 +393,7 @@ MainWindowPrivate::MainWindowPrivate(const QStringList&, const bool reset, MainW
 	});
 
 	// open file on double-click
-	connect(failureTreeView, &QTreeView::doubleClicked, [this](const QModelIndex& index)
+        connect(failureTreeView, &QTableView::doubleClicked, [this](const QModelIndex& index)
 	{
 		if (index.isValid())
 			QDesktopServices::openUrl(QUrl::fromLocalFile(index.data(GTestFailureModel::PathRole).toString()));
@@ -897,53 +904,55 @@ bool MainWindowPrivate::loadTestResults(const QString& testPath, const bool noti
 //--------------------------------------------------------------------------------------------------
 void MainWindowPrivate::selectTest(const QString& testPath)
 {
-	QStack<QString> selectionStack;
-
-	// Store the path the current selection on a stack
-	QModelIndex index = testCaseTreeView->selectionModel()->currentIndex();
-	while (index != QModelIndex())
-	{
-		selectionStack.push(index.data(GTestModel::Name).toString());
-		index = index.parent();
-	}
+	QModelIndex index = testCaseTableView->selectionModel()->currentIndex();
+        QString currentSelectedTestName;
+        if (index.isValid())
+        {
+            currentSelectedTestName = index.data(GTestModel::Name).toString();
+        }
 
 	// Delete the old test case and failure models and make new ones
-	delete testCaseProxyModel->sourceModel();
+        delete testCaseProxyModel->sourceModel();
 	delete failureProxyModel->sourceModel();
-	testCaseTreeView->setSortingEnabled(false);
-	testCaseProxyModel->setSourceModel(new GTestModel(testResultsHash[testPath]));
-	failureProxyModel->invalidate();
-	testCaseTreeView->setSortingEnabled(true);
-	testCaseTreeView->expandAll();
+	testCaseTableView->setSortingEnabled(false);
+
+        // TODO: init with overview Tests.xml
+        GTestModel* gtestModel = new GTestModel(testResultsHash[testPath]);
+        gtestModel->addTestResult(0, testResultsHash[testPath]);
+        testCaseProxyModel->setSourceModel(gtestModel);
+
+	failureProxyModel->clear();
+        // TODO: disable for now -> see TODO add beginning
+	//testCaseTableView->setSortingEnabled(true);
 
 	// make sure the right entry is selected
 	executableTreeView->setCurrentIndex(executableModel->index(testPath));
+	
+ 	// resize the columns
+        for (int i = 0; i < testCaseTableView->model()->columnCount(); i++)
+ 	{
+            testCaseTableView->resizeColumnToContents(i);
+ 	}
 
-	// resize the columns
-	for (int i = 0; i < testCaseTreeView->model()->columnCount(); i++)
-	{
-		testCaseTreeView->resizeColumnToContents(i);
-	}
+        index = QModelIndex();
+        // reset the test case selection
+        if (!currentSelectedTestName.isEmpty())
+        {
+            index = testCaseTableView->model()->index(0, 0);
+            QModelIndexList matches = testCaseTableView->model()->match(index, GTestModel::Name, currentSelectedTestName, 1);
+            if (matches.size() > 0)
+            {
+                index = matches.first();
+            }
+            else
+            {
+                index = QModelIndex();
+            }
+        }
 
-	// reset the test case selection
-	const auto originalStackSize = selectionStack.size();
-	index = testCaseTreeView->model()->index(0, 0);
-	for (int i = 0; i < originalStackSize; ++i)	// don't use a while-loop in case the test changed and what we are searching for doesn't exist
+        if (index.isValid())
 	{
-		QModelIndexList matches = testCaseTreeView->model()->match(index, GTestModel::Name, selectionStack.pop(), 1, Qt::MatchRecursive);
-		if (!matches.empty())
-		{
-			index = matches.first();
-		}
-		else
-		{
-			index = QModelIndex();
-		}
-	}
-
-	if (index.isValid())
-	{
-		testCaseTreeView->selectionModel()->setCurrentIndex(index, QItemSelectionModel::Select | QItemSelectionModel::Rows);
+		testCaseTableView->selectionModel()->setCurrentIndex(index, QItemSelectionModel::Select | QItemSelectionModel::Rows);
 	}
 }
 
@@ -1206,12 +1215,12 @@ void MainWindowPrivate::removeTest(const QModelIndex &index, const bool confirm)
 		testResultsHash.remove(path);
 		fileWatcher->removePath(path);
 
-		const QAbstractItemModel* oldFailureModel = failureProxyModel->sourceModel();
-		const QAbstractItemModel* oldtestCaseModel = testCaseProxyModel->sourceModel();
-		failureProxyModel->setSourceModel(new GTestFailureModel(nullptr));
-		testCaseProxyModel->setSourceModel(new GTestModel(QDomDocument()));
-		delete oldFailureModel;
-		delete oldtestCaseModel;
+                QAbstractItemModel* oldFailureModel = failureProxyModel->sourceModel();
+                QAbstractItemModel* oldtestCaseModel = testCaseProxyModel->sourceModel();
+                failureProxyModel->setSourceModel(new GTestFailureModel(nullptr));
+                testCaseProxyModel->setSourceModel(new GTestModel(QDomDocument()));
+                delete oldFailureModel;
+                delete oldtestCaseModel;
 
 		executableModel->removeRow(index.row(), index.parent());
 	}
@@ -1548,19 +1557,15 @@ void MainWindowPrivate::createExecutableContextMenu()
 //--------------------------------------------------------------------------------------------------
 void MainWindowPrivate::createTestCaseViewContextMenu()
 {
-	testCaseTreeView->setContextMenuPolicy(Qt::CustomContextMenu);
+	testCaseTableView->setContextMenuPolicy(Qt::CustomContextMenu);
 
-	testCaseViewContextMenu = new QMenu(testCaseTreeView);
+	testCaseViewContextMenu = new QMenu(testCaseTableView);
         testCaseViewContextMenu->setToolTipsVisible(true);
 
         testCaseViewRunTestCaseAction_ = new QAction("", testCaseViewContextMenu);
-	testCaseViewExpandAllAction = new QAction("Expand All", testCaseViewContextMenu);
-	testCaseViewCollapseAllAction = new QAction("Collapse All", testCaseViewContextMenu);
 
         testCaseViewContextMenu->addAction(testCaseViewRunTestCaseAction_);
         testCaseViewContextMenu->addSeparator();
-        testCaseViewContextMenu->addAction(testCaseViewExpandAllAction);
-        testCaseViewContextMenu->addAction(testCaseViewCollapseAllAction);
 
         enum SelectedLevel
         {
@@ -1569,9 +1574,10 @@ void MainWindowPrivate::createTestCaseViewContextMenu()
             TestSuite,
             TestCase
         };
-        auto getSelectedIndexLevel = [this](const QModelIndex& testCaseTreeViewIndex) -> SelectedLevel
+        auto getSelectedIndexLevel = [this](QModelIndex testCaseTableViewIndex) -> SelectedLevel
         {
-	        const auto index = testCaseProxyModel->mapToSource(testCaseTreeViewIndex);
+            // TODO: fix
+            auto index = testCaseProxyModel->mapToSource(testCaseTableViewIndex);
             if (!index.isValid())
             {
                 return Nothing;
@@ -1589,9 +1595,9 @@ void MainWindowPrivate::createTestCaseViewContextMenu()
             return TestCase;
         };
 
-        connect(testCaseTreeView, &QListView::customContextMenuRequested, [this, getSelectedIndexLevel](const QPoint& pos)
+        connect(testCaseTableView, &QListView::customContextMenuRequested, [this, getSelectedIndexLevel](const QPoint& pos)
         {
-	        const QModelIndex index = testCaseTreeView->indexAt(pos);
+            QModelIndex index = testCaseTableView->indexAt(pos);
 
             QString runActionText;
             switch (getSelectedIndexLevel(index))
@@ -1620,18 +1626,18 @@ void MainWindowPrivate::createTestCaseViewContextMenu()
             testCaseViewRunTestCaseAction_->setText(runActionText);
             testCaseViewRunTestCaseAction_->setEnabled(!runActionText.isEmpty());
 
-            testCaseViewContextMenu->exec(testCaseTreeView->mapToGlobal(pos));
+            testCaseViewContextMenu->exec(testCaseTableView->mapToGlobal(pos));
         });
 
         connect(testCaseViewRunTestCaseAction_, &QAction::triggered, [this, getSelectedIndexLevel]()
         {
-	        const auto testCaseTreeViewIndexes = testCaseTreeView->selectionModel()->selectedRows();
+        	const auto testCaseTableViewIndexes = testCaseTableView->selectionModel()->selectedRows();
         	QString testFilter;
-	        for (const auto& testCaseTreeViewIndex : testCaseTreeViewIndexes)
+	        for (const auto& testCaseTableViewIndex : testCaseTableViewIndexes)
 	        {
-		        const auto testCaseSourceIndex = testCaseProxyModel->mapToSource(testCaseTreeViewIndex);
+		        const auto testCaseSourceIndex = testCaseProxyModel->mapToSource(testCaseTableViewIndex);
 
-		        switch (getSelectedIndexLevel(testCaseTreeViewIndex))
+		        switch (getSelectedIndexLevel(testCaseTableViewIndex))
 		        {
 		        case Nothing:
 			        // Nothing -> run all
@@ -1684,9 +1690,6 @@ void MainWindowPrivate::createTestCaseViewContextMenu()
 	        const QString path = execIndex.data(QExecutableModel::PathRole).toString();
             runTestInThread(path, false);
         });
-
-	connect(testCaseViewExpandAllAction, &QAction::triggered, testCaseTreeView, &QTreeView::expandAll);
-	connect(testCaseViewCollapseAllAction, &QAction::triggered, testCaseTreeView, &QTreeView::collapseAll);
 }
 
 //--------------------------------------------------------------------------------------------------

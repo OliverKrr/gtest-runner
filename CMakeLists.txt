@@ -117,6 +117,7 @@ src/mainwindow_p.h
 src/executableModelDelegate.h
 src/executableSettingsDialog.h
 src/domitem.h
+src/flatDomeItem.h
 src/GTestFailureModel.h
 src/gtestModel.h
 src/qexecutablemodel.h
@@ -143,6 +144,7 @@ src/mainwindow_p.cpp
 src/executableModelDelegate.cpp
 src/executableSettingsDialog.cpp
 src/domitem.cpp
+src/flatDomeItem.cpp
 src/GTestFailureModel.cpp
 src/gtestModel.cpp
 src/qexecutablemodel.cpp

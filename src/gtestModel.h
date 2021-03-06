@@ -42,64 +42,75 @@
 //	INCLUDE
 //------------------------------
 
-#include <QAbstractItemModel>
+#include <QAbstractTableModel>
 #include <QDomDocument>
 #include <QIcon>
 #include <QModelIndex>
 
-#include "domitem.h"
+#include "flatDomeItem.h"
 
-class GTestModel : public QAbstractItemModel
+class GTestModel : public QAbstractTableModel
 {
-	Q_OBJECT
+    Q_OBJECT
 
 public:
 
-	enum Roles
-	{
-		FailureRole = Qt::UserRole,
-	};
+    enum Roles
+    {
+        FailureRole = Qt::UserRole,
+    };
 
-	enum Sections
-	{
-		Name = 0,
-		TestNumber,
-		Failures,
-		Time,
-		Tests,
-		Errors,
-		Disabled,
-		Timestamp,
-		Last		// always leave this as the last one.
-	};
+    enum Sections
+    {
+        TestNumber = 0,
+        Name,
+        ResultAndTime
+    };
 
-public:
 
-	explicit GTestModel(const QDomDocument& document, QObject *parent = 0);
-	~GTestModel();
+    explicit GTestModel(QDomDocument overviewDocuement, QObject* parent = 0);
 
-	QVariant data(const QModelIndex &index, int role) const Q_DECL_OVERRIDE;
-	Qt::ItemFlags flags(const QModelIndex &index) const Q_DECL_OVERRIDE;
-	QVariant headerData(int section, Qt::Orientation orientation,
-		int role = Qt::DisplayRole) const Q_DECL_OVERRIDE;
-	QModelIndex index(int row, int column,
-		const QModelIndex &parent = QModelIndex()) const Q_DECL_OVERRIDE;
-	QModelIndex parent(const QModelIndex &child) const Q_DECL_OVERRIDE;
-	int rowCount(const QModelIndex &parent = QModelIndex()) const Q_DECL_OVERRIDE;
-	int columnCount(const QModelIndex &parent = QModelIndex()) const Q_DECL_OVERRIDE;
+    void addTestResult(int index, QDomDocument document);
+    void removeTestResult(const int index);
+    FlatDomeItemPtr itemForIndex(const QModelIndex& index) const;
+
+    QVariant data(const QModelIndex &index, int role) const Q_DECL_OVERRIDE;
+    QVariant headerData(int section, Qt::Orientation orientation,
+                        int role = Qt::DisplayRole) const Q_DECL_OVERRIDE;
+    int rowCount(const QModelIndex& parent = QModelIndex()) const Q_DECL_OVERRIDE;
+    int columnCount(const QModelIndex& parent = QModelIndex()) const Q_DECL_OVERRIDE;
 
 private:
-	static void removeComments(QDomNode &node);
+    struct Model
+    {
+        QDomDocument document_;
+        FlatDomeItemHandler domeItemHandler_;
 
-private:
+        explicit Model(const QDomDocument document, const FlatDomeItemHandler domeItemHandler)
+            : document_(document), domeItemHandler_(domeItemHandler)
+        {
+        }
+    };
+    using ModelPtr = std::shared_ptr<Model>;
 
-	QDomDocument domDocument;
-	DomItem *rootItem;
+    ModelPtr modelForColumn(int column) const;
+    Sections sectionForColumn(int column) const;
+    QString timestampForColumn(int column) const;
+    QString indent(int level) const;
+    QString reverseIndent(int level) const;
 
-	QIcon grayIcon;
-	QIcon greenIcon;
-	QIcon yellowIcon;
-	QIcon redIcon;
+    ModelPtr initModel(QDomDocument& document, const QDomDocument& overviewDocuement) const;
+    void removeComments(QDomNode& node) const;
+    bool isFailure(const QDomNode& node) const;
+
+
+    ModelPtr overviewModel_;
+    std::vector<ModelPtr> testResults_;
+
+    QIcon grayIcon;
+    QIcon greenIcon;
+    QIcon yellowIcon;
+    QIcon redIcon;
 };
 
 #endif // gtestModel_h__

@@ -3,7 +3,7 @@
 
 #include <QtXml>
 
-GTestFailureModel::GTestFailureModel(const DomItem* root, QObject *parent)
+GTestFailureModel::GTestFailureModel(const FlatDomeItemPtr root, QObject *parent)
 	: QAbstractItemModel(parent), rootItem(nullptr), failIcon(":/images/fail")
 {
 	if(root)
