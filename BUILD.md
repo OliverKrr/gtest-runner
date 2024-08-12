@@ -19,16 +19,16 @@ Building the gtest-runner from source requires having the following programs ins
 
 * A working compiler
   * Windows:
-    * _Recommended_: [Visual Studio 2015](https://www.visualstudio.com/en-us/products/visual-studio-community-vs.aspx). 
-    * _Minimum_: Visual Studio 2013 is the minimum compatible compiler.
+    * _Recommended_: [Visual Studio 2017](https://www.visualstudio.com/en-us/products/visual-studio-community-vs.aspx).
+    * _Minimum_: Visual Studio 2017 is the minimum compatible compiler.
   * Linux:
     * _Minimum_: gcc 4.9.3.
 * Qt
-  * _Recommended_: [Qt 5.6](http://www.qt.io/download/) in order to support high-DPI monitors.
+  * _Recommended_: [Qt 5.15](http://www.qt.io/download/) in order to support high-DPI monitors.
   * _Minimum_: Qt 5.3 for non high-DPI monitors.
-  * You need to adapt the path of _QTDIR_ in _BuildEnv64.bat_
+  * You need to adapt the path of _QT_ROOT_DIR_ in _BuildEnv64.bat_
 * CMake
-  * _Recommended_: [CMake 3.6.2](https://cmake.org/download/)
+  * _Recommended_: [CMake 3.28.6](https://cmake.org/download/)
   * _Minimum_: CMake 2.8.12
 * _OPTIONAL_
   * git 2.7.0 or later
@@ -42,13 +42,13 @@ _Make sure you've installed all the [prerequisites](#prerequisites) before proce
 
 1. Clone this repo: `git clone https://github.com/OliverKrr/gtest-runner.git`
 2. Start _BuildEnv64.bat_
-4. Ensure that the `QTDIR` environment variable is properly set by typing `echo %QTDIR%`. You should see something like
+4. Ensure that the `QT_ROOT_DIR` environment variable is properly set by typing `echo %QT_ROOT_DIR%`. You should see something like
 
   > C:\Qt\5.6\msvc2015
 
-  * If your `QTDIR` is not set, then set it using `set QTDIR=[path\to\Qt]`, where `[path\to\Qt] is replaced with your install path, example: `set QTDIR=C:\Qt\5.6\msvc2015`
+  * If your `QT_ROOT_DIR` is not set, then set it using `set QT_ROOT_DIR=[path\to\Qt]`, where `[path\to\Qt] is replaced with your install path, example: `set QT_ROOT_DIR=C:\Qt\5.15.14\msvc2017`
 5. Ensure the cmake path is visible to the command line by typing `cmake --version`. If you see
-  > cmake version 3.4.3
+  > cmake version 3.28.6
 
   or similar, proceed to step 6. Otherwise, determine the path to you cmake install, and add it to the path:
 
@@ -139,7 +139,7 @@ Follow the instructions for the [Ubuntu 14.04 Build](s#ubuntu-1404-trusty-build)
 
 Steps 3-5:
   - use your systems package manager to get the prerequisites.
-  - if they are not available, download and build them from source. Make sure to set your `QTDIR`. Make sure your `PATH` variable includes the the cmake `bin` directory.
+  - if they are not available, download and build them from source. Make sure to set your `QT_ROOT_DIR`. Make sure your `PATH` variable includes the the cmake `bin` directory.
 
 # OS X Build
 

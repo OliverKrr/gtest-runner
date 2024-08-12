@@ -2,7 +2,7 @@
 #	CMAKE SETTINGS
 #-------------------------------------------------------------------------------
 
-cmake_minimum_required(VERSION 2.8.12)
+cmake_minimum_required(VERSION 2.8.12...3.28.6)
 set(QT_MINIMUM_VERSION 5.3.0)
 
 #-------------------------------------------------------------------------------
@@ -47,14 +47,14 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(QT_USE_QTMAIN TRUE)
 
-# Setup the cmake prefix path so Qt can be found. Use the QTDIR variable if defined
-if(NOT DEFINED ENV{QTDIR})
-	MESSAGE(STATUS "QTDIR environment variable not set. Be sure to set the QTDIR
+# Setup the cmake prefix path so Qt can be found. Use the QT_ROOT_DIR variable if defined
+if(NOT DEFINED ENV{QT_ROOT_DIR})
+	MESSAGE(STATUS "QT_ROOT_DIR environment variable not set. Be sure to set the QT_ROOT_DIR
 	cmake cache variable to the Qt root install location")
 endif()
 
-set(QTDIR $ENV{QTDIR} CACHE STRING "Qt install path")
-list(APPEND CMAKE_PREFIX_PATH ${QTDIR})
+set(QT_ROOT_DIR $ENV{QT_ROOT_DIR} CACHE STRING "Qt install path")
+list(APPEND CMAKE_PREFIX_PATH ${QT_ROOT_DIR})
 
 # Find the necessary Qt5 modules
 find_package(Qt5Core REQUIRED)
@@ -65,7 +65,7 @@ find_package(Qt5XmlPatterns REQUIRED)
 find_package(Qt5Test REQUIRED)
 
 # Test for supported Qt version
-find_program(QMAKE_EXECUTABLE NAMES qmake HINTS ${QTDIR} ENV QTDIR PATH_SUFFIXES bin)
+find_program(QMAKE_EXECUTABLE NAMES qmake HINTS ${QT_ROOT_DIR} ENV QT_ROOT_DIR PATH_SUFFIXES bin)
 execute_process(COMMAND ${QMAKE_EXECUTABLE} -query QT_VERSION OUTPUT_VARIABLE QT_VERSION)
 if(QT_VERSION VERSION_LESS QT_MINIMUM_VERSION)
 	MESSAGE(FATAL_ERROR "Minimum supported Qt version: ${QT_MINIMUM_VERSION}. Installed version: ${QT_VERSION}")
@@ -245,7 +245,7 @@ INCLUDE(InstallRequiredSystemLibraries)
 # Windows specific build steps
 if(WIN32)
 	# Run winddeployqt if it can be found
-	find_program(WINDEPLOYQT_EXECUTABLE NAMES windeployqt HINTS ${QTDIR} ENV QTDIR PATH_SUFFIXES bin)
+	find_program(WINDEPLOYQT_EXECUTABLE NAMES windeployqt HINTS ${QT_ROOT_DIR} ENV QT_ROOT_DIR PATH_SUFFIXES bin)
 	add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
 	COMMAND ${WINDEPLOYQT_EXECUTABLE} $<TARGET_FILE:${PROJECT_NAME}>)
 	# Gather up all the dependencies in the bin dir

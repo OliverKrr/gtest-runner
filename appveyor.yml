@@ -14,10 +14,10 @@ configuration:
 environment:
   matrix:
   - VS_GEN: Visual Studio 12 2013
-    QTDIR: C:\Qt\5.6\msvc2013
+    QT_ROOT_DIR: C:\Qt\5.6\msvc2013
     EXT: win32
   - VS_GEN: Visual Studio 12 2013 Win64
-    QTDIR: C:\Qt\5.6\msvc2013_64
+    QT_ROOT_DIR: C:\Qt\5.6\msvc2013_64
     EXT: win64
   global:
     PWD:
@@ -27,7 +27,7 @@ matrix:
   fast_finish: true
   
 install:
-  - set PATH=%PATH%;%QTDIR%\bin;"c:\Program Files (x86)\Microsoft SDKs\Windows\v7.1A\Bin\"
+  - set PATH=%PATH%;%QT_ROOT_DIR%\bin;"c:\Program Files (x86)\Microsoft SDKs\Windows\v7.1A\Bin\"
   
 build_script:
   - md build

@@ -1,8 +1,8 @@
-call "C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\vcvarsall.bat" x86_amd64
+call _BuildEnv64.bat
 
-set QTDIR=C:\Qt\5.6\msvc2015
-
-set CMAKE_PREFIX_PATH=%QTDIR%
-
-"C:\Program Files (x86)\Git\bin\bash.exe" --login -i
-REM "C:\Program Files (x86)\Git\git-bash.exe"
+REM Open an interactive Git Bash
+if exist "C:\Program Files (x86)\Git\bin\bash.exe" (
+	"C:\Program Files (x86)\Git\bin\bash.exe" --login -i
+) else (
+	"C:\Program Files\Git\bin\bash.exe" --login -i
+)
