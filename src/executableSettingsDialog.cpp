@@ -17,7 +17,7 @@ class QExecutableSettingsDialogPrivate : public QObject
 
 public:
 
-	QExecutableSettingsDialogPrivate(QExecutableSettingsDialog* q) : QObject(q),
+	explicit QExecutableSettingsDialogPrivate(QExecutableSettingsDialog* q) : QObject(q),
 		q_ptr(q),
 		gtestFilterLabel(new QLabel("Filter:", q)),
 		gtestFilterEdit(new QLineEdit(q)),
@@ -37,8 +37,6 @@ public:
 		gtestOtherArgsLineEdit(new QLineEdit(q)),
 		buttonBox(new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, q))
 	{}
-
-public:
 
 	Q_DECLARE_PUBLIC(QExecutableSettingsDialog);
 
@@ -77,7 +75,7 @@ QExecutableSettingsDialog::QExecutableSettingsDialog(QWidget* parent /*= (QObjec
 	this->setWindowFlags(this->windowFlags() & ~Qt::WindowContextHelpButtonHint);
 	this->setWindowFlags(this->windowFlags() & ~Qt::WindowCloseButtonHint);
 
-	QGridLayout* layout = new QGridLayout(this);
+	auto* layout = new QGridLayout(this);
 	this->setLayout(layout);
 	layout->addWidget(d->gtestFilterLabel, 0, 0);
 	layout->addWidget(d->gtestFilterEdit, 0, 1);
@@ -119,29 +117,21 @@ QExecutableSettingsDialog::QExecutableSettingsDialog(QWidget* parent /*= (QObjec
 	d->gtestRandomSeedValidator->setTop(99999);
 	d->gtestOtherArgsLineEdit->setPlaceholderText("other command line arguments");
 
-	this->setTabOrder(d->gtestFilterEdit, d->gtestRepeatLineEdit);
-	this->setTabOrder(d->gtestRepeatLineEdit, d->gtestAlsoRunDisabledTestsCheckbox);
-        this->setTabOrder(d->gtestAlsoRunDisabledTestsCheckbox, d->gtestFailFastCheckbox);
-        this->setTabOrder(d->gtestFailFastCheckbox, d->gtestShuffleCheckbox);
-	this->setTabOrder(d->gtestShuffleCheckbox, d->gtestRandomSeedLineEdit);
-	this->setTabOrder(d->gtestRandomSeedLineEdit, d->gtestOtherArgsLineEdit);
-	this->setTabOrder(d->gtestOtherArgsLineEdit, d->buttonBox->button(QDialogButtonBox::Ok));
-	this->setTabOrder(d->buttonBox->button(QDialogButtonBox::Ok), d->buttonBox->button(QDialogButtonBox::Cancel));
-	this->setTabOrder(d->buttonBox->button(QDialogButtonBox::Cancel), d->gtestFilterEdit);
+	setTabOrder(d->gtestFilterEdit, d->gtestRepeatLineEdit);
+	setTabOrder(d->gtestRepeatLineEdit, d->gtestAlsoRunDisabledTestsCheckbox);
+        setTabOrder(d->gtestAlsoRunDisabledTestsCheckbox, d->gtestFailFastCheckbox);
+        setTabOrder(d->gtestFailFastCheckbox, d->gtestShuffleCheckbox);
+	setTabOrder(d->gtestShuffleCheckbox, d->gtestRandomSeedLineEdit);
+	setTabOrder(d->gtestRandomSeedLineEdit, d->gtestOtherArgsLineEdit);
+	setTabOrder(d->gtestOtherArgsLineEdit, d->buttonBox->button(QDialogButtonBox::Ok));
+	setTabOrder(d->buttonBox->button(QDialogButtonBox::Ok), d->buttonBox->button(QDialogButtonBox::Cancel));
+	setTabOrder(d->buttonBox->button(QDialogButtonBox::Cancel), d->gtestFilterEdit);
 
 	d->gtestFilterEdit->setFocus();
 
 	connect(d->gtestShuffleCheckbox, &QCheckBox::stateChanged, d->gtestRandomSeedLineEdit, &QLineEdit::setEnabled);
 	connect(d->buttonBox, &QDialogButtonBox::accepted, this, &QExecutableSettingsDialog::accept);
 	connect(d->buttonBox, &QDialogButtonBox::rejected, this, &QExecutableSettingsDialog::reject);
-}
-
-//--------------------------------------------------------------------------------------------------
-//	FUNCTION: ~QExecutableSettingsDialog
-//--------------------------------------------------------------------------------------------------
-QExecutableSettingsDialog::~QExecutableSettingsDialog()
-{
-
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -154,9 +144,9 @@ void QExecutableSettingsDialog::setModelIndex(const QPersistentModelIndex& index
 	d->index = index;
 	d->gtestFilterEdit->setText(index.data(QExecutableModel::FilterRole).toString());
 	d->gtestRepeatLineEdit->setText(index.data(QExecutableModel::RepeatTestsRole).toString());
-	d->gtestAlsoRunDisabledTestsCheckbox->setCheckState((Qt::CheckState)index.data(QExecutableModel::RunDisabledTestsRole).toInt());
-        d->gtestFailFastCheckbox->setCheckState((Qt::CheckState)index.data(QExecutableModel::FailFastRole).toInt());
-	d->gtestShuffleCheckbox->setCheckState((Qt::CheckState)index.data(QExecutableModel::ShuffleRole).toInt());
+	d->gtestAlsoRunDisabledTestsCheckbox->setCheckState(static_cast<Qt::CheckState>(index.data(QExecutableModel::RunDisabledTestsRole).toInt()));
+        d->gtestFailFastCheckbox->setCheckState(static_cast<Qt::CheckState>(index.data(QExecutableModel::FailFastRole).toInt()));
+	d->gtestShuffleCheckbox->setCheckState(static_cast<Qt::CheckState>(index.data(QExecutableModel::ShuffleRole).toInt()));
 	d->gtestRandomSeedLineEdit->setText(index.data(QExecutableModel::RandomSeedRole).toString());
 	d->gtestOtherArgsLineEdit->setText(index.data(QExecutableModel::ArgsRole).toString());
 }
@@ -170,7 +160,7 @@ void QExecutableSettingsDialog::accept()
 
 	if (d->index.isValid())
 	{
-		QAbstractItemModel* model(const_cast<QAbstractItemModel*>(d->index.model()));
+		auto* model(const_cast<QAbstractItemModel*>(d->index.model()));
 		model->setData(model->index(d->index.row(), QExecutableModel::NameColumn), d->gtestFilterEdit->text(), QExecutableModel::FilterRole);
 		model->setData(model->index(d->index.row(), QExecutableModel::NameColumn), d->gtestRepeatLineEdit->text(), QExecutableModel::RepeatTestsRole);
 		model->setData(model->index(d->index.row(), QExecutableModel::NameColumn), d->gtestAlsoRunDisabledTestsCheckbox->checkState(), QExecutableModel::RunDisabledTestsRole);
@@ -182,4 +172,3 @@ void QExecutableSettingsDialog::accept()
 
 	QDialog::accept();
 }
-

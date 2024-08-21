@@ -31,11 +31,11 @@
 //--------------------------------------------------------------------------------------------------
 // 
 // Copyright (c) 2016 Nic Holthaus
+// Copyright (c) 2024 Oliver Karrenbauer
 // 
 //--------------------------------------------------------------------------------------------------
 
-#ifndef executableModelDelegate_h__
-#define executableModelDelegate_h__
+#pragma once
 
 //------------------------------
 //	INCLUDE
@@ -49,25 +49,11 @@
 /// @brief		Represents progress role data as a progress bar
 /// @details	
 //--------------------------------------------------------------------------------------------------
-class QProgressBarDelegate : public QStyledItemDelegate
+class QProgressBarDelegate final : public QStyledItemDelegate
 {
 public:
+	explicit QProgressBarDelegate(QObject* parent = nullptr);
 
-	explicit QProgressBarDelegate(QObject* parent = 0);
-	virtual ~QProgressBarDelegate();
-	
-
-	virtual void paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const override;
-	virtual QSize sizeHint(const QStyleOptionViewItem &option, const QModelIndex &index) const override;
-
-protected:
-
-	
-	
-private:
-
-
-
+	void paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const override;
+	QSize sizeHint(const QStyleOptionViewItem &option, const QModelIndex &index) const override;
 };	// CLASS: QProgressBarDelegate
-
-#endif // executableModelDelegate_h__

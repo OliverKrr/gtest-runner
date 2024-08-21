@@ -1,16 +1,15 @@
 
 #include "mainwindow_p.h"
 
-#include <QDesktopWidget>
-#include <QDragEnterEvent>
-#include <QDropEvent>
-#include <QFileInfo>
+#include <QScreen>
 #include <QMimeData>
+#include <QApplication>
+#include <QDockWidget>
 
 //--------------------------------------------------------------------------------------------------
 //	FUNCTION: MainWindow
 //--------------------------------------------------------------------------------------------------
-MainWindow::MainWindow(QStringList tests, bool reset) : QMainWindow(), d_ptr(new MainWindowPrivate(tests, reset, this))
+MainWindow::MainWindow(const QStringList& tests, const bool reset) : d_ptr(new MainWindowPrivate(tests, reset, this))
 {
 	Q_D(MainWindow);
 
@@ -49,14 +48,6 @@ MainWindow::MainWindow(QStringList tests, bool reset) : QMainWindow(), d_ptr(new
 }
 
 //--------------------------------------------------------------------------------------------------
-//	FUNCTION: ~MainWindow
-//--------------------------------------------------------------------------------------------------
-MainWindow::~MainWindow()
-{
-
-}
-
-//--------------------------------------------------------------------------------------------------
 //	FUNCTION: closeEvent
 //--------------------------------------------------------------------------------------------------
 void MainWindow::closeEvent(QCloseEvent* event)
@@ -80,8 +71,7 @@ void MainWindow::changeEvent(QEvent *e)
 //--------------------------------------------------------------------------------------------------
 QSize MainWindow::sizeHint() const
 {
-	QDesktopWidget* desktop = QApplication::desktop();
-	return 0.5 * desktop->screen(desktop->primaryScreen())->size();
+	return 0.5 * QApplication::primaryScreen()->size();
 }
 
 //--------------------------------------------------------------------------------------------------

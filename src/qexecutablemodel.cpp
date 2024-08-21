@@ -43,14 +43,6 @@ QExecutableModel::QExecutableModel(QObject* parent /*= nullptr*/) : QTreeModel<E
 }
 
 //--------------------------------------------------------------------------------------------------
-//	FUNCTION: ~QExecutableModel
-//--------------------------------------------------------------------------------------------------
-QExecutableModel::~QExecutableModel()
-{
-
-}
-
-//--------------------------------------------------------------------------------------------------
 //	FUNCTION: columnCount
 //--------------------------------------------------------------------------------------------------
 Q_INVOKABLE int QExecutableModel::columnCount(const QModelIndex &parent /*= QModelIndex()*/) const
@@ -61,16 +53,16 @@ Q_INVOKABLE int QExecutableModel::columnCount(const QModelIndex &parent /*= QMod
 // --------------------------------------------------------------------------------------------------
 // 	FUNCTION: data
 // --------------------------------------------------------------------------------------------------
-Q_INVOKABLE QVariant QExecutableModel::data(const QModelIndex &index, int role /*= Qt::DisplayRole*/) const
+Q_INVOKABLE QVariant QExecutableModel::data(const QModelIndex &index, const int role /*= Qt::DisplayRole*/) const
 {
 	if (!index.isValid())
-		return QVariant();
+		return {};
 
 	Q_D(const QExecutableModel);
 
-	auto itr = indexToIterator(index);
+	const auto itr = indexToIterator(index);
 	if (itr == tree.end())
-		return QVariant();
+		return {};
 
 	switch (role)
 	{
@@ -81,21 +73,15 @@ Q_INVOKABLE QVariant QExecutableModel::data(const QModelIndex &index, int role /
 			{
 			case ExecutableData::NOT_RUNNING:
 				return d->grayIcon;
-				break;
 			case ExecutableData::RUNNING:
 				return d->yellowIcon;
-				break;
 			case ExecutableData::PASSED:
 				return d->greenIcon;
-				break;
 			case ExecutableData::FAILED:
 				return d->redIcon;
-				break;
 			default:
 				return QIcon();
-				break;
 			}
-			break;
 		} 
 	case Qt::DisplayRole:
 		switch (index.column())
@@ -103,18 +89,16 @@ Q_INVOKABLE QVariant QExecutableModel::data(const QModelIndex &index, int role /
 		case NameColumn:
 			return data(index, NameRole);
 		default:
-			return QVariant();
+			return {};
 		}
 	case Qt::CheckStateRole:
 		if (index.column() == NameColumn)
 		{
 			if (itr->autorun)
 				return Qt::Checked;
-			else
-				return Qt::Unchecked;
+			return Qt::Unchecked;
 		}
-		else
-			return QVariant();
+		return {};
 	case AutorunRole:
 		return itr->autorun;
 	case PathRole:
@@ -144,16 +128,16 @@ Q_INVOKABLE QVariant QExecutableModel::data(const QModelIndex &index, int role /
 	case ArgsRole:
 		return itr->otherArgs;
 	default:
-		return QVariant();
+		return {};
 	}
 }
 
 //--------------------------------------------------------------------------------------------------
 //	FUNCTION: setData
 //--------------------------------------------------------------------------------------------------
-Q_INVOKABLE bool QExecutableModel::setData(const QModelIndex &index, const QVariant &value, int role /*= Qt::EditRole*/)
+Q_INVOKABLE bool QExecutableModel::setData(const QModelIndex &index, const QVariant &value, const int role /*= Qt::EditRole*/)
 {
-	auto itr = indexToIterator(index);
+	const auto itr = indexToIterator(index);
 	switch (role)
 	{
 	case Qt::EditRole || Qt::DisplayRole || QExecutableModel::PathRole:
@@ -171,7 +155,7 @@ Q_INVOKABLE bool QExecutableModel::setData(const QModelIndex &index, const QVari
 		itr->autorun = value.toBool();
 		break;
 	case StateRole:
-		itr->state = (ExecutableData::States)value.toInt();
+		itr->state = static_cast<ExecutableData::States>(value.toInt());
 		break;
 	case LastModifiedRole:
 		itr->lastModified = value.toDateTime();
@@ -186,13 +170,13 @@ Q_INVOKABLE bool QExecutableModel::setData(const QModelIndex &index, const QVari
 		itr->repeat = value.toInt();
 		break;
 	case RunDisabledTestsRole:
-		itr->runDisabled = (Qt::CheckState)value.toInt();
+		itr->runDisabled = static_cast<Qt::CheckState>(value.toInt());
 		break;
         case FailFastRole:
-                itr->failFast = (Qt::CheckState)value.toInt();
+                itr->failFast = static_cast<Qt::CheckState>(value.toInt());
                 break;
 	case ShuffleRole:
-		itr->shuffle = (Qt::CheckState)value.toInt();
+		itr->shuffle = static_cast<Qt::CheckState>(value.toInt());
 		break;
 	case RandomSeedRole:
 		itr->randomSeed = value.toInt();
@@ -205,7 +189,7 @@ Q_INVOKABLE bool QExecutableModel::setData(const QModelIndex &index, const QVari
 	}
 
 	// signal that the whole row has changed
-	QModelIndex right = index.sibling(index.row(), columnCount());
+	const QModelIndex right = index.sibling(index.row(), columnCount());
 	emit dataChanged(index, right);
 	return true;
 }
@@ -230,8 +214,8 @@ QModelIndex QExecutableModel::index(const QString& path) const
 // 		}
 // 	}
 
-	auto itr = std::find(begin(), end(), path);
-	QModelIndex index = iteratorToIndex(itr);
+const auto itr = std::find(begin(), end(), path);
+const QModelIndex index = iteratorToIndex(itr);
 		
 	// cache for later use
 	d_ptr->indexCache[path] = index;
@@ -242,7 +226,7 @@ QModelIndex QExecutableModel::index(const QString& path) const
 //--------------------------------------------------------------------------------------------------
 //	FUNCTION: index
 //--------------------------------------------------------------------------------------------------
-QModelIndex QExecutableModel::index(int row, int column, const QModelIndex &parent /*= QModelIndex()*/) const
+QModelIndex QExecutableModel::index(const int row, const int column, const QModelIndex &parent /*= QModelIndex()*/) const
 {
 	return QTreeModel::index(row, column, parent);
 }
@@ -262,7 +246,7 @@ QStringList QExecutableModel::mimeTypes() const
 //--------------------------------------------------------------------------------------------------
 QMimeData * QExecutableModel::mimeData(const QModelIndexList &indexes) const
 {
-	QMimeData *mimeData = new QMimeData();
+	auto *mimeData = new QMimeData();
 	QByteArray encodedData;
 
 	QDataStream stream(&encodedData, QIODevice::WriteOnly);
@@ -297,7 +281,7 @@ QMimeData * QExecutableModel::mimeData(const QModelIndexList &indexes) const
 //--------------------------------------------------------------------------------------------------
 //	FUNCTION: dropMimeData
 //--------------------------------------------------------------------------------------------------
-bool QExecutableModel::dropMimeData(const QMimeData *data, Qt::DropAction action, int row, int column, const QModelIndex &parent)
+bool QExecutableModel::dropMimeData(const QMimeData *data, const Qt::DropAction action, int row, int column, const QModelIndex &parent)
 {
 	if (action == Qt::IgnoreAction)
 		return true;
@@ -353,7 +337,7 @@ bool QExecutableModel::dropMimeData(const QMimeData *data, Qt::DropAction action
 //--------------------------------------------------------------------------------------------------
 QMap<int, QVariant> QExecutableModel::itemData(const QModelIndex &index) const
 {
-	auto itr = indexToIterator(index);
+	const auto itr = indexToIterator(index);
 	QMap<int, QVariant> ret;
 	ret[PathRole] = itr->path;
         ret[NameRole] = itr->name;
@@ -381,18 +365,18 @@ bool QExecutableModel::setItemData(const QModelIndex &index, const QMap<int, QVa
 	// invalidate the cache on a remove
 	d->indexCache.clear();
 
-	auto itr = indexToIterator(index);
+	const auto itr = indexToIterator(index);
 	itr->path = roles[PathRole].toString();
         itr->name = roles[NameRole].toString();
         itr->testDriver = roles[TestDriverRole].toString();
-	itr->state = (ExecutableData::States)roles[StateRole].toInt();
+	itr->state = static_cast<ExecutableData::States>(roles[StateRole].toInt());
 	itr->lastModified = roles[LastModifiedRole].toDateTime();
 	itr->progress = roles[ProgressRole].toInt();
 	itr->filter = roles[FilterRole].toString();
 	itr->repeat = roles[RepeatTestsRole].toInt();
-	itr->runDisabled = (Qt::CheckState)roles[RunDisabledTestsRole].toInt();
-        itr->failFast = (Qt::CheckState)roles[FailFastRole].toInt();
-	itr->shuffle = (Qt::CheckState)roles[ShuffleRole].toInt();
+	itr->runDisabled = static_cast<Qt::CheckState>(roles[RunDisabledTestsRole].toInt());
+        itr->failFast = static_cast<Qt::CheckState>(roles[FailFastRole].toInt());
+	itr->shuffle = static_cast<Qt::CheckState>(roles[ShuffleRole].toInt());
 	itr->randomSeed = roles[RandomSeedRole].toInt();
 	itr->otherArgs = roles[ArgsRole].toString();
 	itr->autorun = roles[AutorunRole].toBool();
@@ -450,7 +434,7 @@ Qt::ItemFlags QExecutableModel::flags(const QModelIndex &index) const
 //--------------------------------------------------------------------------------------------------
 //	FUNCTION: insertRows
 //--------------------------------------------------------------------------------------------------
-bool QExecutableModel::insertRows(int row, int count, const QModelIndex &parent /*= QModelIndex()*/)
+bool QExecutableModel::insertRows(const int row, const int count, const QModelIndex &parent /*= QModelIndex()*/)
 {
 	Q_D(QExecutableModel);
 	// invalidate the cache on a remove
@@ -461,7 +445,7 @@ bool QExecutableModel::insertRows(int row, int count, const QModelIndex &parent 
 //--------------------------------------------------------------------------------------------------
 //	FUNCTION: removeRows
 //--------------------------------------------------------------------------------------------------
-bool QExecutableModel::removeRows(int row, int count, const QModelIndex &parent /*= QModelIndex()*/)
+bool QExecutableModel::removeRows(const int row, const int count, const QModelIndex &parent /*= QModelIndex()*/)
 {
 	Q_D(QExecutableModel);
 	// invalidate the cache on a remove
@@ -472,7 +456,7 @@ bool QExecutableModel::removeRows(int row, int count, const QModelIndex &parent 
 //--------------------------------------------------------------------------------------------------
 //	FUNCTION: removeRow
 //--------------------------------------------------------------------------------------------------
-QModelIndex QExecutableModel::removeRow(int row, const QModelIndex &parent /*= QModelIndex()*/)
+QModelIndex QExecutableModel::removeRow(const int row, const QModelIndex &parent /*= QModelIndex()*/)
 {
 	Q_D(QExecutableModel);
 	// invalidate the cache on a remove

@@ -35,8 +35,7 @@
 // 
 //--------------------------------------------------------------------------------------------------
 
-#ifndef qexecutabletreeview_h__
-#define qexecutabletreeview_h__
+#pragma once
 
 //------------------------------
 //	INCLUDE
@@ -55,22 +54,24 @@ class QExecutableTreeViewPrivate;
 /// @brief		
 /// @details	
 //--------------------------------------------------------------------------------------------------
-class QExecutableTreeView : public QTreeView
+class QExecutableTreeView final : public QTreeView
 {
     Q_OBJECT
 public:
 
-	QExecutableTreeView(QWidget* parent = (QWidget*)0);
+	explicit QExecutableTreeView(QWidget* parent = nullptr);
 
     signals:
         void itemSelectionChanged();
 
 protected:
+    void selectionChanged(const QItemSelection &selected, const QItemSelection &deselected) override;
 
-        virtual void selectionChanged(const QItemSelection &selected, const QItemSelection &deselected) override;
-        virtual bool eventFilter(QObject* obj, QEvent* event) override;
-	virtual void rowsInserted(const QModelIndex &parent, int start, int end) override;
-	virtual void rowsAboutToBeRemoved(const QModelIndex &parent, int start, int end) override;
+    bool eventFilter(QObject* obj, QEvent* event) override;
+
+    void rowsInserted(const QModelIndex &parent, int start, int end) override;
+
+    void rowsAboutToBeRemoved(const QModelIndex &parent, int start, int end) override;
 
 private:
 
@@ -78,4 +79,3 @@ private:
 	QExecutableTreeViewPrivate*	d_ptr;
 };	// CLASS: QExecutableTreeView
 
-#endif // qexecutabletreeview_h__

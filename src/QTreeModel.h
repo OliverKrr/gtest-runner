@@ -31,6 +31,7 @@
 //--------------------------------------------------------------------------------------------------
 // 
 // Copyright (c) 2016 Nic Holthaus
+// Copyright (c) 2024 Oliver Karrenbauer
 // 
 //--------------------------------------------------------------------------------------------------
 
@@ -138,7 +139,7 @@ public:
 	{
 		if (parent != tree.end())
 		{
-			int position = static_cast<int>(tree.child_count(parent));
+			const int position = static_cast<int>(tree.child_count(parent));
 			beginInsertRows(iteratorToIndex(parent), position, position);
 			auto returnItr = tree.emplace(parent, std::forward<Args>(args)...);
 			endInsertRows();
@@ -163,7 +164,7 @@ public:
 		return iteratorToIndex(insertRow(indexToIterator(parent), std::forward<Args>(args)...));
 	}
 
-	virtual bool insertRows(int row, int count, const QModelIndex &parent) override
+	virtual bool insertRows(int row, const int count, const QModelIndex &parent) override
 	{
 		iterator parentItr = indexToIterator(parent);
 
@@ -199,7 +200,7 @@ public:
 		return iteratorToIndex(removeRow(tree.child_at(indexToIterator(parent), row)));
 	}
 
-	virtual bool removeRows(int row, int count, const QModelIndex &parent = QModelIndex()) override
+	virtual bool removeRows(int row, const int count, const QModelIndex &parent = QModelIndex()) override
 	{
 		iterator parentItr = indexToIterator(parent);
 

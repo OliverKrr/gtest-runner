@@ -35,8 +35,7 @@
 // 
 //--------------------------------------------------------------------------------------------------
 
-#ifndef mainwindow_h__
-#define mainwindow_h__
+#pragma once
 
 //------------------------------
 //	INCLUDE
@@ -57,21 +56,18 @@ class MainWindow : public QMainWindow
 {
 public:
 
-	explicit MainWindow(QStringList tests, bool reset);
-	virtual ~MainWindow();
+	explicit MainWindow(const QStringList& tests, bool reset);
 
 private:
 
 	Q_DECLARE_PRIVATE(MainWindow);
 
-	virtual void closeEvent(QCloseEvent *) override;
-	virtual void changeEvent(QEvent *) override;
-	virtual QSize sizeHint() const override;
-	virtual void dragEnterEvent(QDragEnterEvent *) override;
-	virtual void dropEvent(QDropEvent *) override;
+	void closeEvent(QCloseEvent *) override;
+	void changeEvent(QEvent *) override;
+	QSize sizeHint() const override;
+	void dragEnterEvent(QDragEnterEvent *) override;
+	void dropEvent(QDropEvent *) override;
 
 	MainWindowPrivate*	d_ptr;
 
 };	// CLASS: MainWindow
-
-#endif // mainwindow_h__

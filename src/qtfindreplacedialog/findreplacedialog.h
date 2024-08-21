@@ -32,7 +32,7 @@ public:
       * Associates the text editor where to perform the search
       * @param textEdit
       */
-    void setTextEdit(QTextEdit *textEdit);
+    void setTextEdit(QTextEdit *textEdit) const;
 
     /**
       * Writes the state of the form to the passed settings.

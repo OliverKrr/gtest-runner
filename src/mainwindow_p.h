@@ -35,8 +35,7 @@
 // 
 //--------------------------------------------------------------------------------------------------
 
-#ifndef mainwindow_p_h__
-#define mainwindow_p_h__
+#pragma once
 
 //------------------------------
 //	INCLUDE
@@ -48,7 +47,6 @@
 #include "qexecutabletreeview.h"
 #include "QStdOutSyntaxHighlighter.h"
 #include "appinfo.h"
-#include "gtestModel.h"
 #include "killTestWrapper.h"
 
 #include <finddialog.h>
@@ -57,35 +55,19 @@
 #include <condition_variable>
 #include <map>
 #include <mutex>
-#include <thread>
 
-#include <QAction>
-#include <QActionGroup>
-#include <QApplication>
 #include <QDateTime>
-#include <QDebug>
-#include <QDesktopServices>
 #include <QDialog>
-#include <QDockWidget>
 #include <QDomDocument>
-#include <QEventLoop>
 #include <QFileDialog>
 #include <QFileSystemWatcher>
 #include <QFrame>
 #include <QHash>
 #include <QLayout>
 #include <QLineEdit>
-#include <QListWidget>
-#include <QMenu>
-#include <QMessageBox>
-#include <QPersistentModelIndex>
 #include <QProcess>
-#include <QPushButton>
 #include <QShortcut>
-#include <QStandardItem>
-#include <QStandardItemModel>
 #include <QStandardPaths>
-#include <QStatusBar>
 #include <QSystemTrayIcon>
 #include <QTextEdit>
 #include <QTreeView>
@@ -142,8 +124,8 @@ public:
 	QFrame*									consoleFrame;							///< Console Dock frame.
 	QVBoxLayout*							consoleButtonLayout;					///< Layout for the console dock buttons.
 	QHBoxLayout*							consoleLayout;							///< Console Dock Layout.
-	QPushButton*							consolePrevFailureButton;						///< Jumps the the previous failure.
-	QPushButton*							consoleNextFailureButton;						///< Jumps the the next failure.
+	QPushButton*							consolePrevFailureButton;						///< Jumps the previous failure.
+	QPushButton*							consoleNextFailureButton;						///< Jumps the next failure.
 	QTextEdit*								consoleTextEdit;						///< Console emulator text edit
 	QStdOutSyntaxHighlighter*				consoleHighlighter;						///< Console syntax highlighter.
 	FindDialog*								consoleFindDialog;						///< Dialog to find stuff in the console.
@@ -212,11 +194,11 @@ public:
 	// synchronization
 	std::mutex								threadKillMutex;						
 	std::condition_variable					threadKillCv;							///< Condition variable that is notified when a thread is killed.
-        // Sempaphore to control synchronous test running
+        // Semaphore to control synchronous test running
         QSemaphore runTestParallelSemaphore_;
         // Wrapper of signal to kill a specific test
         std::map<QString, std::atomic<KillTestWrapper*>> testKillHandler_;
-        // Temporary Time of latests build changes
+        // Temporary Time of latest build changes
         std::map<QString, QDateTime> latestBuildChangeTime_;
 
 signals:
@@ -230,24 +212,25 @@ signals:
 
 public:
 
-	explicit MainWindowPrivate(QStringList tests, bool reset, MainWindow* q);
+	explicit MainWindowPrivate(const QStringList& tests, bool reset, MainWindow* q);
 
-	QString xmlPath(const QString& testPath, const bool create = false) const;
+	static QString xmlPath(const QString& testPath, bool create = false) ;
         QString latestGtestResultPath(const QString& testPath);
         void addTestExecutable(const QString& path, const QString& name, const QString& testDriver, bool autorun,
-                               QDateTime lastModified, QString filter = "", int repeat = 0,
+                               QDateTime lastModified, const QString& filter = "", int repeat = 0,
                                Qt::CheckState runDisabled = Qt::Unchecked, Qt::CheckState failFast = Qt::Unchecked, Qt::CheckState shuffle = Qt::Unchecked,
-                               int randomSeed = 0, QString otherArgs = "");
+                               int randomSeed = 0, const QString& otherArgs = "");
 	void runTestInThread(const QString& pathToTest, bool notify);
 	bool loadTestResults(const QString& testPath, bool notify);
 	void selectTest(const QString& testPath);
 	void saveSettings() const;
 	void loadSettings();
-        void removeAllTest(const bool confirm = false);
-	void removeTest(const QModelIndex &index, const bool confirm = false);
+        void removeAllTest(bool confirm = false);
+	void removeTest(const QModelIndex &index, bool confirm = false);
         void killAllTestAndWait();
-	void clearData();
-	void clearSettings();
+	void clearData() const;
+
+	static void clearSettings();
         void updateTestExecutables();
 
 protected:
@@ -264,11 +247,11 @@ protected:
 	void createTestCaseViewContextMenu();
 	void createConsoleContextMenu();
 
-	void scrollToConsoleCursor();
+	void scrollToConsoleCursor() const;
 
         ///< kills the test if it's currently running
         void emitKillTest(const QString& path);
-        void killAllTest(const bool confirm = false);
+        void killAllTest(bool confirm = false);
 
         void saveCommonSettings(const QString& path) const;
         QString pathToCurrenRunEnvSettings() const;
@@ -278,17 +261,14 @@ protected:
         void loadTestSettingsForCurrentRunEnv();
         void loadTestSettings(const QString& path);
 
-        void updateButtonsForRunningTests();
+        void updateButtonsForRunningTests() const;
 
 
-        QString settingsPath() const;
-        QString dataPath() const;
+	static QString settingsPath();
+        static QString dataPath() ;
 	
 private:
 
 	QString currentRunEnvPath_;
 
 };	// CLASS: MainWindowPrivate
-
-
-#endif // mainwindow_p_h__

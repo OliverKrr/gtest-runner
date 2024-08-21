@@ -34,12 +34,11 @@
 //
 //--------------------------------------------------------------------------------------------------
 
-#ifndef killtestwrapper_p_h__
-#define killtestwrapper_p_h__
+#pragma once
 
 #include <QObject>
 
-class KillTestWrapper : public QObject
+class KillTestWrapper final : public QObject
 {
     Q_OBJECT
 
@@ -65,5 +64,3 @@ private:
 signals:
     void killTest();
 };
-
-#endif // killtestwrapper_p_h__

@@ -9,32 +9,21 @@ QBottomUpSortFilterProxy::QBottomUpSortFilterProxy(QObject *parent /*= (QObject*
 {
 
 }
-// --------------------------------------------------------------------------------
-// 	FUNCTION: ~QBottomUpSortFilterProxy (public )
-// --------------------------------------------------------------------------------
-QBottomUpSortFilterProxy::~QBottomUpSortFilterProxy()
-{
 
-}
 // --------------------------------------------------------------------------------
 // 	FUNCTION: filterAcceptsRow (public )
 // --------------------------------------------------------------------------------
-bool QBottomUpSortFilterProxy::filterAcceptsRow(int sourceRow, const QModelIndex &sourceParent) const
+bool QBottomUpSortFilterProxy::filterAcceptsRow(const int sourceRow, const QModelIndex &sourceParent) const
 {
-	bool iAmAccepted = sourceModel()->data(sourceParent, Qt::DisplayRole).toString().contains(filterRegExp());
-	std::string debug = sourceModel()->data(sourceParent, Qt::DisplayRole).toString().toStdString();
-	return (filterAcceptsDescendant(sourceRow, sourceParent) || filterAcceptsAncestor(sourceParent));
-	return true;
+	return filterAcceptsDescendant(sourceRow, sourceParent) || filterAcceptsAncestor(sourceParent);
 }
 // --------------------------------------------------------------------------------
 // 	FUNCTION: filterAcceptsDescendant (public )
 // --------------------------------------------------------------------------------
-bool QBottomUpSortFilterProxy::filterAcceptsDescendant(int sourceRow, const QModelIndex &sourceParent) const
+bool QBottomUpSortFilterProxy::filterAcceptsDescendant(const int sourceRow, const QModelIndex &sourceParent) const
 {
 	// This function is inclusive of the original row queried in addition to all its descendants.
-	QModelIndex rowToTest = sourceModel()->index(sourceRow, 0, sourceParent);
-
-	std::string debug = sourceModel()->data(rowToTest).toString().toStdString();
+	const QModelIndex rowToTest = sourceModel()->index(sourceRow, 0, sourceParent);
 
 	/// do bottom to top filtering
 	if (sourceModel()->hasChildren(rowToTest))
@@ -54,9 +43,7 @@ bool QBottomUpSortFilterProxy::filterAcceptsDescendant(int sourceRow, const QMod
 // --------------------------------------------------------------------------------
 bool QBottomUpSortFilterProxy::filterAcceptsAncestor(const QModelIndex &sourceIndex) const
 {
-	QModelIndex sourceParentIndex = sourceIndex.parent();
-
-	std::string debug = sourceModel()->data(sourceParentIndex).toString().toStdString();
+	const QModelIndex sourceParentIndex = sourceIndex.parent();
 
 	/// do bottom to top filtering
 	if (sourceParentIndex != QModelIndex())

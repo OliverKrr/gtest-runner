@@ -75,7 +75,7 @@ public:
 
 public:
 
-	explicit GTestModel(QDomDocument document, QObject *parent = 0);
+	explicit GTestModel(const QDomDocument& document, QObject *parent = 0);
 	~GTestModel();
 
 	QVariant data(const QModelIndex &index, int role) const Q_DECL_OVERRIDE;
@@ -89,8 +89,7 @@ public:
 	int columnCount(const QModelIndex &parent = QModelIndex()) const Q_DECL_OVERRIDE;
 
 private:
-
-	void removeComments(QDomNode &node);
+	static void removeComments(QDomNode &node);
 
 private:
 

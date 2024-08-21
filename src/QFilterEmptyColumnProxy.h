@@ -38,11 +38,11 @@
 
 #include <QSortFilterProxyModel>
 
-class QFilterEmptyColumnProxy : public QSortFilterProxyModel
+class QFilterEmptyColumnProxy final : public QSortFilterProxyModel
 {
 	Q_OBJECT
 public:
-    QFilterEmptyColumnProxy(QObject* parent = nullptr);
+    explicit QFilterEmptyColumnProxy(QObject* parent = nullptr);
 
 protected:
     bool filterAcceptsColumn(int sourceColumn, const QModelIndex& sourceParent) const override;

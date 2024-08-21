@@ -44,7 +44,8 @@ FindReplaceForm::~FindReplaceForm()
     delete ui;
 }
 
-void FindReplaceForm::hideReplaceWidgets() {
+void FindReplaceForm::hideReplaceWidgets() const
+{
     ui->replaceLabel->setVisible(false);
     ui->textToReplace->setVisible(false);
     ui->replaceButton->setVisible(false);
@@ -87,7 +88,7 @@ void FindReplaceForm::textToFindChanged() {
     ui->findButton->setEnabled(ui->textToFind->text().size() > 0);
 }
 
-void FindReplaceForm::regexpSelected(bool sel) {
+void FindReplaceForm::regexpSelected(const bool sel) {
     if (sel)
         validateRegExp(ui->textToFind->text());
     else
@@ -134,12 +135,12 @@ void FindReplaceForm::find() {
     find(ui->downRadioButton->isChecked());
 }
 
-void FindReplaceForm::find(bool next) {
+void FindReplaceForm::find(const bool next) {
     if (!textEdit)
         return; // TODO: show some warning?
 
     // backward search
-    bool back = !next;
+    const bool back = !next;
 
     const QString &toSearch = ui->textToFind->text();
 
@@ -156,8 +157,8 @@ void FindReplaceForm::find(bool next) {
 
     if (ui->regexCheckBox->isChecked()) 
 	{
-        QRegExp reg(toSearch,
-                    (ui->caseCheckBox->isChecked() ? Qt::CaseSensitive : Qt::CaseInsensitive));
+        const QRegExp reg(toSearch,
+                          (ui->caseCheckBox->isChecked() ? Qt::CaseSensitive : Qt::CaseInsensitive));
 
         textCursor = textEdit->document()->find(reg, textCursor, flags);
         textEdit->setTextCursor(textCursor);

@@ -34,8 +34,7 @@
 // 
 //--------------------------------------------------------------------------------------------------
 
-#ifndef QBottomUpSortFilterProxy_h__
-#define QBottomUpSortFilterProxy_h__
+#pragma once
 
 //------------------------
 //	INCLUDES
@@ -55,21 +54,11 @@ class QBottomUpSortFilterProxy : public QSortFilterProxyModel
 	Q_OBJECT
 
 public:
-
-	QBottomUpSortFilterProxy(QObject *parent = (QObject*)0);
-	~QBottomUpSortFilterProxy();
+	explicit QBottomUpSortFilterProxy(QObject *parent = nullptr);
 
 protected:
-
 	bool filterAcceptsRow(int sourceRow, const QModelIndex &sourceParent) const override;
 	bool filterAcceptsDescendant(int sourceRow, const QModelIndex &sourceParent) const;
 	bool filterAcceptsAncestor(const QModelIndex &sourceIndex) const;
 
-private:
-
-
-
 };
-
-
-#endif // QBottomUpSortFilterProxy_h__

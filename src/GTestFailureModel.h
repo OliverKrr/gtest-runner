@@ -35,17 +35,14 @@
 // 
 //--------------------------------------------------------------------------------------------------
 
-#ifndef GTESTFAILUREMODEL_H__
-#define GTESTFAILUREMODEL_H__
+#pragma once
 
-#include <QAbstractItemModel>
-#include <QDomDocument>
 #include <QIcon>
 #include <QModelIndex>
 
 class DomItem;
 
-class GTestFailureModel : public QAbstractItemModel
+class GTestFailureModel final : public QAbstractItemModel
 {
 	Q_OBJECT
 
@@ -58,10 +55,8 @@ public:
 		MessageRole = Qt::UserRole + 2,
 	};
 
-public:
-
-	explicit GTestFailureModel(DomItem* root, QObject *parent = 0);
-	~GTestFailureModel();
+	explicit GTestFailureModel(const DomItem* root, QObject *parent = nullptr);
+	~GTestFailureModel() override;
 
 	QVariant data(const QModelIndex &index, int role) const Q_DECL_OVERRIDE;
 	Qt::ItemFlags flags(const QModelIndex &index) const Q_DECL_OVERRIDE;
@@ -79,5 +74,3 @@ private:
 
 	QIcon failIcon;
 };
-
-#endif // GTESTFAILUREMODEL_H__

@@ -35,8 +35,7 @@
 // 
 //--------------------------------------------------------------------------------------------------
 
-#ifndef executableSettingsDialog_h__
-#define executableSettingsDialog_h__
+#pragma once
 
 //------------------------------
 //	INCLUDE
@@ -53,26 +52,16 @@ class QExecutableSettingsDialogPrivate;
 /// @brief		Dialog box to set gtest command line options on a per-test basis
 /// @details	
 //--------------------------------------------------------------------------------------------------
-class QExecutableSettingsDialog : public QDialog
+class QExecutableSettingsDialog final : public QDialog
 {
 public:
-
-	explicit QExecutableSettingsDialog(QWidget* parent = (QWidget*)0);
-	virtual ~QExecutableSettingsDialog();
+	explicit QExecutableSettingsDialog(QWidget* parent = nullptr);
 	
 	void setModelIndex(const QPersistentModelIndex& index);
-	virtual void accept() override;
+	void accept() override;
 
-protected:
-
-	
-	
 private:
-
 	Q_DECLARE_PRIVATE(QExecutableSettingsDialog);
 
 	QExecutableSettingsDialogPrivate*	d_ptr;
-
 };	// CLASS: QExecutableSettingsDialog
-
-#endif // executableSettingsDialog_h__

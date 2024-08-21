@@ -16,19 +16,11 @@ QProgressBarDelegate::QProgressBarDelegate(QObject* parent /*= 0*/) : QStyledIte
 }
 
 //--------------------------------------------------------------------------------------------------
-//	FUNCTION: ~QProgressBarDelegate
-//--------------------------------------------------------------------------------------------------
-QProgressBarDelegate::~QProgressBarDelegate()
-{
-
-}
-
-//--------------------------------------------------------------------------------------------------
 //	FUNCTION: paint
 //--------------------------------------------------------------------------------------------------
 void QProgressBarDelegate::paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const
 {
-	double progress = index.data(QExecutableModel::ProgressRole).toDouble() * 100;
+	const double progress = index.data(QExecutableModel::ProgressRole).toDouble() * 100;
 	if (std::isnan(progress) || progress <= 0.0 || progress >= 100.0)
 	{
 		QStyledItemDelegate::paint(painter, option, index);
@@ -36,17 +28,15 @@ void QProgressBarDelegate::paint(QPainter *painter, const QStyleOptionViewItem &
 	else
 	{
 		const QFontMetrics &fm = option.fontMetrics;
-		auto height = qMin(qCeil(QFontMetricsF(fm).height()) + 2, option.rect.height());
-		int adjust = (option.rect.height() - height) / 2;
-
-		double progress = index.data(QExecutableModel::ProgressRole).toDouble() * 100;
+		const auto height = qMin(qCeil(QFontMetricsF(fm).height()) + 2, option.rect.height());
+		const int adjust = (option.rect.height() - height) / 2;
 
 		QStyleOptionProgressBar progressBarOption;
 		progressBarOption.rect = option.rect.adjusted(2, adjust, -2, -adjust);
 		progressBarOption.rect.setWidth(option.rect.width() - 2 * 2);
 		progressBarOption.minimum = 0;
 		progressBarOption.maximum = 100;
-		progressBarOption.progress = progress;
+		progressBarOption.progress = static_cast<int>(progress);
 
 		if (option.state & QStyle::State_Selected)
 		{
@@ -63,5 +53,5 @@ void QProgressBarDelegate::paint(QPainter *painter, const QStyleOptionViewItem &
 //--------------------------------------------------------------------------------------------------
 QSize QProgressBarDelegate::sizeHint(const QStyleOptionViewItem &option, const QModelIndex &index) const
 {
-	return QSize(50, QStyledItemDelegate::sizeHint(option, index).height());
+	return {50, QStyledItemDelegate::sizeHint(option, index).height()};
 }

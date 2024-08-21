@@ -31,6 +31,7 @@
 //--------------------------------------------------------------------------------------------------
 // 
 // Copyright (c) 2016 Nic Holthaus
+// Copyright (c) 2024 Oliver Karrenbauer
 // 
 //--------------------------------------------------------------------------------------------------
 
@@ -58,21 +59,21 @@ int main(int argc, char *argv[])
 #if (QT_VERSION >= QT_VERSION_CHECK(5,6,0))
 	QApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
 #endif
-	
-	QApplication app(argc, argv);	
-	app.setOrganizationName(APPINFO::organization);
-	app.setOrganizationDomain(APPINFO::oranizationDomain);
-	app.setApplicationName(APPINFO::name);
-	app.setApplicationVersion(APPINFO::version);
+
+	const QApplication app(argc, argv);	
+	QApplication::setOrganizationName(APPINFO::organization);
+	QApplication::setOrganizationDomain(APPINFO::oranizationDomain);
+	QApplication::setApplicationName(APPINFO::name);
+	QApplication::setApplicationVersion(APPINFO::version);
 
 	QCommandLineParser parser;
 
-	QCommandLineOption addTestsOption(QStringList() << "a" << "add", "Add tests executables (comma separated)", "tests", "");
-	QCommandLineOption resetOption(QStringList() << "r" << "reset", "Reset gtest-runner to it's original factory settings. This removes all tests and test data.");
+	const QCommandLineOption addTestsOption(QStringList() << "a" << "add", "Add tests executables (comma separated)", "tests", "");
+	const QCommandLineOption resetOption(QStringList() << "r" << "reset", "Reset gtest-runner to it's original factory settings. This removes all tests and test data.");
 
 	parser.setApplicationDescription("An automated test runner and user interface for google test unit tests.");
-	auto helpOption = parser.addHelpOption();
-	auto versionOption = parser.addVersionOption();
+	const auto helpOption = parser.addHelpOption();
+	const auto versionOption = parser.addVersionOption();
 	parser.addOption(addTestsOption);
 	parser.addOption(resetOption);
 	
@@ -94,10 +95,10 @@ int main(int argc, char *argv[])
 		exit(0);
 	}
 
-	bool reset = parser.isSet(resetOption);
-	QStringList tests = parser.value(addTestsOption).split(',');
+	const bool reset = parser.isSet(resetOption);
+	const QStringList tests = parser.value(addTestsOption).split(',');
 
 	MainWindow mainWin(tests, reset);
 	mainWin.show();
-	return app.exec();
+	return QApplication::exec();
 }

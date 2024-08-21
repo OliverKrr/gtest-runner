@@ -7,7 +7,7 @@
 class QExecutableTreeViewPrivate
 {
 public:
-	QExecutableTreeViewPrivate(QExecutableTreeView* q) :
+	explicit QExecutableTreeViewPrivate(QExecutableTreeView* q) :
 		settingsDialog(new QExecutableSettingsDialog(q))
 	{
 		settingsDialog->setModal(false);
@@ -33,7 +33,7 @@ void QExecutableTreeView::selectionChanged(const QItemSelection &selected, const
 //--------------------------------------------------------------------------------------------------
 //	FUNCTION: rowsInserted
 //--------------------------------------------------------------------------------------------------
-void QExecutableTreeView::rowsInserted(const QModelIndex &parent, int start, int end)
+void QExecutableTreeView::rowsInserted(const QModelIndex &parent, const int start, const int end)
 {
 	Q_D(QExecutableTreeView);
 
@@ -43,7 +43,7 @@ void QExecutableTreeView::rowsInserted(const QModelIndex &parent, int start, int
 	{
 		QModelIndex newRow = this->model()->index(i, 0, parent);
 
-		QPushButton* advButton = new QPushButton();
+		auto advButton = new QPushButton();
 		advButton->setIcon(QIcon(":/images/hamburger"));
 		advButton->setToolTip("Advanced...");
 		advButton->setFixedSize(18, 18);
@@ -54,8 +54,8 @@ void QExecutableTreeView::rowsInserted(const QModelIndex &parent, int start, int
 		{
 			if (!d->settingsDialog->isVisible())
 			{
-				QModelIndex index = this->indexAt(this->mapFromGlobal(QCursor::pos()));
-				auto pos = advButton->mapToGlobal(advButton->rect().bottomLeft());
+				const QModelIndex index = this->indexAt(this->mapFromGlobal(QCursor::pos()));
+				const auto pos = advButton->mapToGlobal(advButton->rect().bottomLeft());
 				d->settingsDialog->move(pos);
 				d->settingsDialog->setModelIndex(index);
 				d->settingsDialog->show();
@@ -72,21 +72,21 @@ bool QExecutableTreeView::eventFilter(QObject* obj, QEvent* event)
 {
     if (event->type() == QEvent::FocusIn)
     {
-        QPushButton* advButton = static_cast<QPushButton*>(obj);
-        auto pos = advButton->mapToGlobal(advButton->rect().center());
-        QModelIndex index = this->indexAt(this->mapFromGlobal(pos));
+	    const auto* advButton = static_cast<QPushButton*>(obj);
+	    const auto pos = advButton->mapToGlobal(advButton->rect().center());
+	    const QModelIndex index = this->indexAt(this->mapFromGlobal(pos));
         if (index.isValid())
         {
             this->setCurrentIndex(index);
         }
     }
-    return QObject::eventFilter(obj, event);
+    return QTreeView::eventFilter(obj, event);
 }
 
 //--------------------------------------------------------------------------------------------------
 //	FUNCTION: rowsAboutToBeRemoved
 //--------------------------------------------------------------------------------------------------
-void QExecutableTreeView::rowsAboutToBeRemoved(const QModelIndex &parent, int start, int end)
+void QExecutableTreeView::rowsAboutToBeRemoved(const QModelIndex &parent, const int start, const int end)
 {
 	for (int i = start; i <= end; i++)
 	{

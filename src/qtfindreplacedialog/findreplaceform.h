@@ -60,7 +60,7 @@ public:
     void setTextEdit(QTextEdit *textEdit_);
 
     /// hides replace widgets from the form
-    void hideReplaceWidgets();
+    void hideReplaceWidgets() const;
 
     /**
       * Writes the state of the form to the passed settings.

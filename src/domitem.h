@@ -38,8 +38,7 @@
 **
 ****************************************************************************/
 
-#ifndef DOMITEM_H
-#define DOMITEM_H
+#pragma once
 
 #include <QDomNode>
 #include <QHash>
@@ -47,12 +46,12 @@
 class DomItem
 {
 public:
-	DomItem(const QDomNode &node, int row, DomItem *parent = 0);
+	DomItem(const QDomNode &node, int row, DomItem *parent = nullptr);
 	~DomItem();
 	DomItem *child(int i);
-	DomItem *parent();
+	DomItem *parent() const;
 	QDomNode node() const;
-	int row();
+	int row() const;
 
 private:
 	QDomNode domNode;
@@ -60,5 +59,3 @@ private:
 	DomItem *parentItem;
 	int rowNumber;
 };
-
-#endif // DOMITEM_H

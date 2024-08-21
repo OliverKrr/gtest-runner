@@ -31,6 +31,7 @@
 //--------------------------------------------------------------------------------------------------
 // 
 // Copyright (c) 2016 Nic Holthaus
+// Copyright (c) 2024 Oliver Karrenbauer
 // 
 //--------------------------------------------------------------------------------------------------
 
@@ -276,7 +277,7 @@ public:
 	 * @returns		an iterator referring to the past-the-end element in the Tree container. If three
 	 *				tree is const-qualified, the function returns a const_iterator.\n
 	 */
-	iterator end() const /*noexcept*/
+	static iterator end() /*noexcept*/
 	{
 		return iterator(nullptr);
 	}

@@ -4,7 +4,7 @@
 #include <QIcon>
 #include <QtXml>
 
-GTestModel::GTestModel(QDomDocument document, QObject *parent)
+GTestModel::GTestModel(const QDomDocument& document, QObject *parent)
 	: QAbstractItemModel(parent), domDocument(document), grayIcon(":/images/gray"),
 	greenIcon(":/images/green"), yellowIcon(":/images/yellow"), redIcon(":/images/red")
 {
@@ -22,16 +22,16 @@ int GTestModel::columnCount(const QModelIndex &/*parent*/) const
 	return Last;
 }
 
-QVariant GTestModel::data(const QModelIndex &index, int role) const
+QVariant GTestModel::data(const QModelIndex &index, const int role) const
 {
 	if (!index.isValid())
 		return QVariant();
 
-	DomItem *item = static_cast<DomItem*>(index.internalPointer());
+	const DomItem *item = static_cast<DomItem*>(index.internalPointer());
 
-	QDomNode node = item->node();
+	const QDomNode node = item->node();
 	QStringList attributes;
-	QDomNamedNodeMap attributeMap = node.attributes();
+	const QDomNamedNodeMap attributeMap = node.attributes();
 
 	switch(role)
 	{
@@ -133,8 +133,8 @@ Qt::ItemFlags GTestModel::flags(const QModelIndex &index) const
 	}
 }
 
-QVariant GTestModel::headerData(int section, Qt::Orientation orientation,
-	int role) const
+QVariant GTestModel::headerData(const int section, const Qt::Orientation orientation,
+                                const int role) const
 {
 	if (orientation == Qt::Horizontal && role == Qt::DisplayRole) {
 		switch (section) {
@@ -162,7 +162,7 @@ QVariant GTestModel::headerData(int section, Qt::Orientation orientation,
 	return QVariant();
 }
 
-QModelIndex GTestModel::index(int row, int column, const QModelIndex &parent)
+QModelIndex GTestModel::index(const int row, const int column, const QModelIndex &parent)
 const
 {
 	if (!hasIndex(row, column, parent))
@@ -187,7 +187,7 @@ QModelIndex GTestModel::parent(const QModelIndex &child) const
 	if (!child.isValid())
 		return QModelIndex();
 
-	DomItem *childItem = static_cast<DomItem*>(child.internalPointer());
+	const DomItem *childItem = static_cast<DomItem*>(child.internalPointer());
 	DomItem *parentItem = childItem->parent();
 
 	if (!parentItem || parentItem == rootItem)

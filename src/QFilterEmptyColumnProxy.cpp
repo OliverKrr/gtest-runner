@@ -43,7 +43,7 @@ QFilterEmptyColumnProxy::QFilterEmptyColumnProxy(QObject* parent) : QSortFilterP
 // --------------------------------------------------------------------------------
 
 
-bool QFilterEmptyColumnProxy::filterAcceptsColumn(int sourceColumn, const QModelIndex& sourceParent) const
+bool QFilterEmptyColumnProxy::filterAcceptsColumn(const int sourceColumn, const QModelIndex& sourceParent) const
 {
     if (!sourceModel()->hasChildren())
     {

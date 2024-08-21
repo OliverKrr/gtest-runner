@@ -31,6 +31,7 @@
 //--------------------------------------------------------------------------------------------------
 // 
 // Copyright (c) 2016 Nic Holthaus
+// Copyright (c) 2024 Oliver Karrenbauer
 // 
 //--------------------------------------------------------------------------------------------------
 
@@ -85,7 +86,7 @@ public:
 			QRegExp expression(rule.pattern);
 			int index = expression.indexIn(text);
 			while (index >= 0) {
-				int length = expression.matchedLength();
+				const int length = expression.matchedLength();
 				setFormat(index, length, rule.format);
 				index = expression.indexIn(text, index + length);
 			}
