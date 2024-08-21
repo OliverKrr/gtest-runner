@@ -36,9 +36,11 @@
 
 #include "flatDomeItem.h"
 
+#include <utility>
 
-FlatDomeItem::FlatDomeItem(const QDomNode& node, const int level, const int row)
-    : node_(node), level_(level), row_(row)
+
+FlatDomeItem::FlatDomeItem(const QDomNode& node, const int level, const int row, const int parentIndex)
+    : node_(node), level_(level), row_(row), parentIndex_(parentIndex)
 {
     // nothing
 }
@@ -58,20 +60,27 @@ int FlatDomeItem::row() const
     return row_;
 }
 
+int FlatDomeItem::parentIndex() const
+{
+    return parentIndex_;
+}
 
-FlatDomeItemHandler::FlatDomeItemHandler(const QDomNode& rootNode, const QDomNode& rootReferenceNode, const FilterFunc& filterFunc)
-    : filterFunc_(filterFunc)
+
+FlatDomeItemHandler::FlatDomeItemHandler(const QDomNode& rootNode, const QDomNode& rootReferenceNode,
+                                         FilterFunc filterFunc)
+    : filterFunc_(std::move(filterFunc))
 {
     if (rootNode.isNull() || rootReferenceNode.isNull())
     {
         return;
     }
-    int level = 0;
+    constexpr int level = 0;
     int row = 0;
-    addChildren(rootNode, rootReferenceNode, level, row);
+    addChildren(rootNode, rootReferenceNode, level, row, -1);
 }
 
-void FlatDomeItemHandler::addChildren(const QDomNode& node, const QDomNode& referenceNode, const int level, int& row)
+void FlatDomeItemHandler::addChildren(const QDomNode& node, const QDomNode& referenceNode,
+                                      const int level, int& row, const int parentIndex)
 {
     int currentOffset = 0;
     for (int i = 0; i < referenceNode.childNodes().count(); ++i)
@@ -86,7 +95,7 @@ void FlatDomeItemHandler::addChildren(const QDomNode& node, const QDomNode& refe
         bool found = false;
         for (int j = currentOffset; j < node.childNodes().count(); ++j)
         {
-            // Search if we contain node from refernce
+            // Search if we contain node from reference
             const auto& childNode = node.childNodes().item(j);
             QString childName = childNode.attributes().namedItem("name").nodeValue();
             if (referenceChildName == childName)
@@ -101,7 +110,7 @@ void FlatDomeItemHandler::addChildren(const QDomNode& node, const QDomNode& refe
         if (found)
         {
             childNode = node.childNodes().item(currentOffset);
-            addItem(childNode, level, row);
+            addItem(childNode, level, row, parentIndex);
         }
         else
         {
@@ -109,14 +118,14 @@ void FlatDomeItemHandler::addChildren(const QDomNode& node, const QDomNode& refe
             addEmptyItem(level, row);
         }
 
-        addChildren(childNode, referenceChildNode, level + 1, row);
+        addChildren(childNode, referenceChildNode, level + 1, row, static_cast<int>(items_.size() - 1));
     }
 }
 
-void FlatDomeItemHandler::addItem(const QDomNode& node, const int level, int& row)
+void FlatDomeItemHandler::addItem(const QDomNode& node, const int level, int& row, const int parentIndex)
 {
     int itemRow = level == 2 ? ++row : 0;
-    FlatDomeItemPtr item = std::make_shared<FlatDomeItem>(node, level, itemRow);
+    auto item = std::make_shared<FlatDomeItem>(node, level, itemRow, parentIndex);
     items_.emplace_back(item);
 }
 
@@ -136,7 +145,7 @@ bool FlatDomeItemHandler::shouldAddItem(const QDomNode& node) const
 
 FlatDomeItemPtr FlatDomeItemHandler::item(const std::size_t row) const
 {
-    if (row >= 0 && row < items_.size())
+    if (row < items_.size())
     {
         return items_[row];
     }
@@ -145,5 +154,5 @@ FlatDomeItemPtr FlatDomeItemHandler::item(const std::size_t row) const
 
 int FlatDomeItemHandler::numberItems() const
 {
-    return items_.size();
+    return static_cast<int>(items_.size());
 }

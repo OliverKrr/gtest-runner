@@ -2,6 +2,8 @@
 #include "QStdOutSyntaxHighlighter.h"
 #include "mainwindow_p.h"
 #include "executableModelDelegate.h"
+#include "testsController.h"
+#include "utilities.h"
 #include "gtestModel.h"
 
 #include <QApplication>
@@ -28,18 +30,9 @@
 #define PYTHON "py"
 #endif
 
-namespace
-{
-const QString TEST_DRIVER_NAME = "TestDriver.py";
-const QString GTEST_RESULT_NAME = "gtest-runner_result.xml";
-const QString LATEST_RESULT_DIR_NAME = "latest";
-const QString DATE_FORMAT = "yyyy.MM.dd_hh.mm.ss.zzz";
-const int MAX_PARALLEL_TEST_EXEC = QThreadPool::globalInstance()->maxThreadCount();
-}
-
 /* \brief Simple exception-safe semaphore locker
 */
-class SemaphoreLocker
+class SemaphoreLocker final
 {
 public:
     explicit SemaphoreLocker(QSemaphore& semaphore, const int n = 1)
@@ -47,7 +40,8 @@ public:
     {
         semaphore_.acquire(n_);
     }
-    virtual ~SemaphoreLocker()
+
+    ~SemaphoreLocker()
     {
         semaphore_.release(n_);
     }
@@ -61,527 +55,530 @@ private:
 //--------------------------------------------------------------------------------------------------
 //	FUNCTION: MainWindowPrivate
 //--------------------------------------------------------------------------------------------------
-MainWindowPrivate::MainWindowPrivate(const QStringList&, const bool reset, MainWindow* q) :
-	q_ptr(q),
-        toolBar_(new QToolBar(q)),
-        runEnvComboBox_(new QComboBox(toolBar_)),
-        runEnvModel_(new QStringListModel(toolBar_)),
-	executableDock(new QDockWidget(q)),
-	executableDockFrame(new QFrame(q)),
-	executableTreeView(new QExecutableTreeView(q)),
-	executableModel(new QExecutableModel(q)),
-        testCaseProxyModel(new QSortFilterProxyModel(q)),
-        updateTestsButton(new QPushButton(q)),
-        toggleAutoRun_(new QPushButton(q)),
-        fileWatcher(new QFileSystemWatcher(q)),
-	centralFrame(new QFrame(q)),
-	testCaseFilterEdit(new QLineEdit(q)),
-        testCaseTableView(new QTableView(q)),
-	statusBar(new QStatusBar(q)),
-	failureDock(new QDockWidget(q)),
-	failureTreeView(new QTreeView(q)),
-	failureProxyModel(new QFilterEmptyColumnProxy(q)),
-        statusBar(new QStatusBar(q)),
-	consoleDock(new QDockWidget(q)),
-	consoleFrame(new QFrame(q)),
-	consoleButtonLayout(new QVBoxLayout()),
-	consoleLayout(new QHBoxLayout()),
-	consolePrevFailureButton(new QPushButton(q)),
-	consoleNextFailureButton(new QPushButton(q)),
-	consoleTextEdit(new QTextEdit(q)),
-	consoleHighlighter(new QStdOutSyntaxHighlighter(consoleTextEdit)),
-	consoleFindDialog(new FindDialog(consoleTextEdit)),
-	systemTrayIcon(new QSystemTrayIcon(QIcon(":/images/logo"), q)),
-	mostRecentFailurePath(""),
-        runTestParallelSemaphore_(MAX_PARALLEL_TEST_EXEC)
+MainWindowPrivate::MainWindowPrivate(const QStringList&, const bool reset, MainWindow* q) : q_ptr(q),
+    toolBar_(new QToolBar(q)),
+    runEnvComboBox_(new QComboBox(toolBar_)),
+    runEnvModel_(new QStringListModel(toolBar_)),
+    executableDock(new QDockWidget(q)),
+    executableDockFrame(new QFrame(q)),
+    executableTreeView(new QExecutableTreeView(q)),
+    executableModel(new QExecutableModel(q)),
+    updateTestsButton(new QPushButton(q)),
+    toggleAutoRun_(new QPushButton(q)),
+    fileWatcher(new QFileSystemWatcher(q)),
+    centralFrame(new QFrame(q)),
+    testCaseFilterEdit(new QLineEdit(q)),
+    testCaseTableView(new QTableView(q)),
+    testCaseProxyModel(new QSortFilterProxyModel(q)),
+    failureDock(new QDockWidget(q)),
+    failureTreeView(new QTreeView(q)),
+    failureProxyModel(new QFilterEmptyColumnProxy(q)),
+    statusBar(new QStatusBar(q)),
+    consoleDock(new QDockWidget(q)),
+    consoleFrame(new QFrame(q)),
+    consoleButtonLayout(new QVBoxLayout()),
+    consoleLayout(new QHBoxLayout()),
+    consolePrevFailureButton(new QPushButton(q)),
+    consoleNextFailureButton(new QPushButton(q)),
+    consoleTextEdit(new QTextEdit(q)),
+    consoleHighlighter(new QStdOutSyntaxHighlighter(consoleTextEdit)),
+    consoleFindDialog(new FindDialog(consoleTextEdit)),
+    systemTrayIcon(new QSystemTrayIcon(QIcon(":/images/logo"), q)),
+    testsController_(new TestsController(q)),
+    mostRecentFailurePath(""),
+    runTestParallelSemaphore_(MAX_PARALLEL_TEST_EXEC)
 {
-	qRegisterMetaType<QVector<int>>("QVector<int>");
+    qRegisterMetaType<QVector<int>>("QVector<int>");
 
-	if (reset)
-	{
-		clearData();
-		clearSettings();
-	}
+    if (reset)
+    {
+        clearData();
+        clearSettings();
+    }
 
-	QFontDatabase::addApplicationFont(":/fonts/consolas");
-	const QFont consolas("consolas", 10);
+    QFontDatabase::addApplicationFont(":/fonts/consolas");
+    const QFont consolas("consolas", 10);
 
-	centralFrame->setLayout(new QVBoxLayout);
-	centralFrame->layout()->addWidget(testCaseFilterEdit);
-        centralFrame->layout()->addWidget(testCaseTableView);
-	centralFrame->layout()->setContentsMargins(0, 5, 0, 0);
+    centralFrame->setLayout(new QVBoxLayout);
+    centralFrame->layout()->addWidget(testCaseFilterEdit);
+    centralFrame->layout()->addWidget(testCaseTableView);
+    centralFrame->layout()->setContentsMargins(0, 5, 0, 0);
 
-	executableDock->setObjectName("executableDock");
-	executableDock->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea | Qt::TopDockWidgetArea | Qt::BottomDockWidgetArea);
-	executableDock->setWindowTitle("Test Executables");
-	executableDock->setWidget(executableDockFrame);
+    executableDock->setObjectName("executableDock");
+    executableDock->setAllowedAreas(
+        Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea | Qt::TopDockWidgetArea | Qt::BottomDockWidgetArea);
+    executableDock->setWindowTitle("Test Executables");
+    executableDock->setWidget(executableDockFrame);
 
-	executableTreeView->setModel(executableModel);
-	executableTreeView->setSelectionMode(QAbstractItemView::SingleSelection);
-	executableTreeView->setSelectionBehavior(QAbstractItemView::SelectRows);
- 	executableTreeView->setDragDropMode(QTreeView::InternalMove);
-	executableTreeView->setHeaderHidden(true);
-	executableTreeView->setIndentation(0);
-	executableTreeView->setEditTriggers(QAbstractItemView::NoEditTriggers);
-	executableTreeView->setItemDelegateForColumn(QExecutableModel::ProgressColumn, new QProgressBarDelegate(executableTreeView));
+    executableTreeView->setModel(executableModel);
+    executableTreeView->setSelectionMode(QAbstractItemView::SingleSelection);
+    executableTreeView->setSelectionBehavior(QAbstractItemView::SelectRows);
+    executableTreeView->setDragDropMode(QTreeView::InternalMove);
+    executableTreeView->setHeaderHidden(true);
+    executableTreeView->setIndentation(0);
+    executableTreeView->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    executableTreeView->setItemDelegateForColumn(QExecutableModel::ProgressColumn,
+                                                 new QProgressBarDelegate(executableTreeView));
 
-	executableDockFrame->setLayout(new QVBoxLayout);
-	executableDockFrame->layout()->addWidget(executableTreeView);
-        executableDockFrame->layout()->addWidget(toggleAutoRun_);
-        executableDockFrame->layout()->addWidget(updateTestsButton);
+    executableDockFrame->setLayout(new QVBoxLayout);
+    executableDockFrame->layout()->addWidget(executableTreeView);
+    executableDockFrame->layout()->addWidget(toggleAutoRun_);
+    executableDockFrame->layout()->addWidget(updateTestsButton);
 
-        toggleAutoRun_->setText("Toggle auto-run");
-        toggleAutoRun_->setToolTip("When auto-run is enabled, the test executables are being watched and automatically executed when being re-build.");
+    toggleAutoRun_->setText("Toggle auto-run");
+    toggleAutoRun_->setToolTip(
+        "When auto-run is enabled, the test executables are being watched and automatically executed when being re-build.");
 
-        updateTestsButton->setText("Update tests");
-        updateTestsButton->setToolTip("Search current RunEnv.bat/sh dir for TestDriver.py and related test executables");
+    updateTestsButton->setText("Update tests");
+    updateTestsButton->setToolTip("Search current RunEnv.bat/sh dir for TestDriver.py and related test executables");
 
-	testCaseFilterEdit->setPlaceholderText("Filter Test Output...");
-	testCaseFilterEdit->setClearButtonEnabled(true);
+    testCaseFilterEdit->setPlaceholderText("Filter Test Output...");
+    testCaseFilterEdit->setClearButtonEnabled(true);
 
-        // TODO: disable sorting for now -> need to ensure that "TestAll/Suite" doesn't get mixed up
-	testCaseTableView->setSortingEnabled(false);
-	//testCaseTableView->sortByColumn(GTestModel::TestNumber, Qt::AscendingOrder);
-        testCaseTableView->setSelectionMode(QAbstractItemView::ExtendedSelection);
-		testCaseTableView->setSelectionBehavior(QAbstractItemView::SelectRows);
-        testCaseTableView->setWordWrap(false);
-        // TODO
-        //testCaseTableView->setFixedHeight();
-        testCaseTableView->verticalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
-        testCaseTableView->setTextElideMode(Qt::ElideMiddle);
-        testCaseTableView->setModel(testCaseProxyModel);
+    // TODO: disable sorting for now -> need to ensure that "TestAll/Suite" doesn't get mixed up
+    // TODO: when sort on success -> toggle between time & failure
+    testCaseTableView->setSortingEnabled(false);
+    //testCaseTableView->sortByColumn(GTestModel::TestNumber, Qt::AscendingOrder);
+    testCaseTableView->setSelectionMode(QAbstractItemView::ExtendedSelection);
+    testCaseTableView->setSelectionBehavior(QAbstractItemView::SelectRows);
+    testCaseTableView->setWordWrap(false);
+    testCaseTableView->verticalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
+    testCaseTableView->setTextElideMode(Qt::ElideMiddle);
+    testCaseTableView->setModel(testCaseProxyModel);
 
-	testCaseProxyModel->setFilterCaseSensitivity(Qt::CaseInsensitive);
+    testCaseProxyModel->setFilterCaseSensitivity(Qt::CaseInsensitive);
+    testCaseProxyModel->setFilterKeyColumn(-1);
 
-	failureDock->setObjectName("failureDock");
-	failureDock->setAllowedAreas(Qt::BottomDockWidgetArea | Qt::TopDockWidgetArea | Qt::RightDockWidgetArea | Qt::LeftDockWidgetArea);
-	failureDock->setWindowTitle("Failures");
-	failureDock->setWidget(failureTreeView);
+    failureDock->setObjectName("failureDock");
+    failureDock->setAllowedAreas(
+        Qt::BottomDockWidgetArea | Qt::TopDockWidgetArea | Qt::RightDockWidgetArea | Qt::LeftDockWidgetArea);
+    failureDock->setWindowTitle("Failures");
+    failureDock->setWidget(failureTreeView);
 
-	failureTreeView->setModel(failureProxyModel);
-	failureTreeView->setAlternatingRowColors(true);
+    failureTreeView->setModel(failureProxyModel);
+    failureTreeView->setAlternatingRowColors(true);
 
-	consoleDock->setObjectName("consoleDock");
-	consoleDock->setAllowedAreas(Qt::BottomDockWidgetArea | Qt::TopDockWidgetArea | Qt::RightDockWidgetArea | Qt::LeftDockWidgetArea);
-	consoleDock->setWindowTitle("Console Output");
-	consoleDock->setWidget(consoleFrame);
+    consoleDock->setObjectName("consoleDock");
+    consoleDock->setAllowedAreas(
+        Qt::BottomDockWidgetArea | Qt::TopDockWidgetArea | Qt::RightDockWidgetArea | Qt::LeftDockWidgetArea);
+    consoleDock->setWindowTitle("Console Output");
+    consoleDock->setWidget(consoleFrame);
 
-	consoleFrame->setLayout(consoleLayout);
+    consoleFrame->setLayout(consoleLayout);
 
-	consoleLayout->addLayout(consoleButtonLayout);
-	consoleLayout->addWidget(consoleTextEdit);
-	consoleTextEdit->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    consoleLayout->addLayout(consoleButtonLayout);
+    consoleLayout->addWidget(consoleTextEdit);
+    consoleTextEdit->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 
-	consoleButtonLayout->addWidget(consolePrevFailureButton);
-	consoleButtonLayout->addWidget(consoleNextFailureButton);
+    consoleButtonLayout->addWidget(consolePrevFailureButton);
+    consoleButtonLayout->addWidget(consoleNextFailureButton);
 
-	consolePrevFailureButton->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Expanding);
-	consolePrevFailureButton->setMaximumWidth(20);
-	consolePrevFailureButton->setIcon(q->style()->standardIcon(QStyle::SP_ArrowUp));
-	consolePrevFailureButton->setToolTip("Show Previous Test-case Failure");
+    consolePrevFailureButton->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Expanding);
+    consolePrevFailureButton->setMaximumWidth(20);
+    consolePrevFailureButton->setIcon(q->style()->standardIcon(QStyle::SP_ArrowUp));
+    consolePrevFailureButton->setToolTip("Show Previous Test-case Failure");
 
-	consoleNextFailureButton->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Expanding);
-	consoleNextFailureButton->setMaximumWidth(20);
-	consoleNextFailureButton->setIcon(q->style()->standardIcon(QStyle::SP_ArrowDown));
-	consoleNextFailureButton->setToolTip("Show Next Test-case Failure");
+    consoleNextFailureButton->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Expanding);
+    consoleNextFailureButton->setMaximumWidth(20);
+    consoleNextFailureButton->setIcon(q->style()->standardIcon(QStyle::SP_ArrowDown));
+    consoleNextFailureButton->setToolTip("Show Next Test-case Failure");
 
-	consoleTextEdit->setFont(consolas);
-	QPalette p = consoleTextEdit->palette();
-	p.setColor(QPalette::Base, Qt::black);
-	p.setColor(QPalette::Text, Qt::white);
-	consoleTextEdit->setPalette(p);
-	consoleTextEdit->setReadOnly(true);
+    consoleTextEdit->setFont(consolas);
+    QPalette p = consoleTextEdit->palette();
+    p.setColor(QPalette::Base, Qt::black);
+    p.setColor(QPalette::Text, Qt::white);
+    consoleTextEdit->setPalette(p);
+    consoleTextEdit->setReadOnly(true);
 
-	consoleFindDialog->setTextEdit(consoleTextEdit);
+    consoleFindDialog->setTextEdit(consoleTextEdit);
 
-        systemTrayIcon->show();
+    systemTrayIcon->show();
 
-        toolBar_->setObjectName("toolbar");
-        toolBar_->setWindowTitle("Toolbar");
-        createToolBar();
+    toolBar_->setObjectName("toolbar");
+    toolBar_->setWindowTitle("Toolbar");
+    createToolBar();
 
-        createTestMenu();
-	createOptionsMenu();
-	createWindowMenu();
-	createThemeMenu();
-	createHelpMenu();
+    createTestMenu();
+    createOptionsMenu();
+    createWindowMenu();
+    createThemeMenu();
+    createHelpMenu();
 
-	createExecutableContextMenu();
-	createConsoleContextMenu();
-	createTestCaseViewContextMenu();
+    createExecutableContextMenu();
+    createConsoleContextMenu();
+    createTestCaseViewContextMenu();
 
-        numberOfRunningTests_ = 0;
-        updateButtonsForRunningTests();
+    numberOfRunningTests_ = 0;
+    updateButtonsForRunningTests();
 
-	connect(this, &MainWindowPrivate::setStatus, statusBar, &QStatusBar::setStatusTip, Qt::QueuedConnection);
-	connect(this, &MainWindowPrivate::testResultsReady, this, &MainWindowPrivate::loadTestResults, Qt::QueuedConnection);
-	connect(this, &MainWindowPrivate::testResultsReady, statusBar, &QStatusBar::clearMessage, Qt::QueuedConnection);
-	connect(this, &MainWindowPrivate::showMessage, statusBar, &QStatusBar::showMessage, Qt::QueuedConnection);
+    connect(this, &MainWindowPrivate::setStatus, statusBar, &QStatusBar::setStatusTip, Qt::QueuedConnection);
+    connect(this, &MainWindowPrivate::testResultsReady, this, &MainWindowPrivate::loadTestResults,
+            Qt::QueuedConnection);
+    connect(this, &MainWindowPrivate::testResultsReady, statusBar, &QStatusBar::clearMessage, Qt::QueuedConnection);
+    connect(this, &MainWindowPrivate::showMessage, statusBar, &QStatusBar::showMessage, Qt::QueuedConnection);
 
-        connect(toggleAutoRun_, &QPushButton::clicked, [this]()
+    connect(toggleAutoRun_, &QPushButton::clicked, [this]()
+    {
+        for (int i = 0; i < executableModel->rowCount(); ++i)
         {
-            for (int i = 0; i < executableModel->rowCount(); ++i)
-            {
-                auto index = executableModel->index(i, 0);
-                QString path = index.data(QExecutableModel::PathRole).toString();
-                const bool prevState = executableCheckedStateHash[path];
-                executableModel->setData(index, !prevState, QExecutableModel::AutorunRole);
-            }
-        });
+            auto index = executableModel->index(i, 0);
+            QString path = index.data(QExecutableModel::PathRole).toString();
+            const bool prevState = testsController_->autoRun(path);
+            executableModel->setData(index, !prevState, QExecutableModel::AutorunRole);
+        }
+    });
 
-        // Update Tests
-        connect(updateTestsButton, &QPushButton::clicked, [this]()
+    // Update Tests
+    connect(updateTestsButton, &QPushButton::clicked, [this]()
+    {
+        if (currentRunEnvPath_.isEmpty())
         {
-            if (currentRunEnvPath_.isEmpty())
+            addRunEnvAction->trigger();
+        }
+        else
+        {
+            updateTestExecutables();
+        }
+    });
+
+    // TODO: make checkbox to show only failed
+    // TODO: make after "filter test output..."
+    // TODO: add "run only failed"
+
+    // TODO: support following options
+    //  --gtest_break_on_failure
+    // TODO: don't switch test while hovering over left side
+
+    // switch testCase models when new tests are clicked
+    connect(executableTreeView->selectionModel(), &QItemSelectionModel::selectionChanged,
+            [this](const QItemSelection& selected, const QItemSelection& deselected)
             {
-                addRunEnvAction->trigger();
+                if (!selected.isEmpty())
+                {
+                    const auto index = selected.indexes().first();
+                    selectTest(index.data(QExecutableModel::PathRole).toString());
+                }
+            });
+
+    // run the test whenever the executable changes
+    connect(fileWatcher, &QFileSystemWatcher::fileChanged, this, [this](const QString& path)
+    {
+        const QModelIndex m = executableModel->index(path);
+        if (m.isValid())
+        {
+            // only auto-run if the test is checked
+            if (m.data(QExecutableModel::AutorunRole).toBool())
+            {
+                emit showMessage("Change detected: " + path + "...");
+
+                auto currentTime = QDateTime::currentDateTime();
+                latestBuildChangeTime_[path] = currentTime;
+
+                // add a little delay to avoid running multiple instances of the same test build,
+                // and to avoid running the file before visual studio is done writing it.
+                QTimer::singleShot(2000, [this, path, currentTime]
+                {
+                    // Only run after latest update after timeout and not by previous triggers
+                    if (currentTime == latestBuildChangeTime_[path])
+                    {
+                        emit runTestInThread(path, true);
+                    }
+                });
             }
             else
             {
-                updateTestExecutables();
+                executableModel->setData(m, ExecutableData::NOT_RUNNING, QExecutableModel::StateRole);
             }
-        });
+        }
+    });
 
-	// switch testCase models when new tests are clicked
-	connect(executableTreeView->selectionModel(), &QItemSelectionModel::selectionChanged, [this](const QItemSelection& selected, const QItemSelection& deselected)
-	{
-		if(!selected.isEmpty())
-		{
-			const auto index = selected.indexes().first();
-			selectTest(index.data(QExecutableModel::PathRole).toString());
-		}
-	});
+    // run test when signaled to. Queued connection so that multiple quick invocations will
+    // be collapsed together.
+    connect(this, &MainWindowPrivate::runTest, this, &MainWindowPrivate::runTestInThread, Qt::QueuedConnection);
 
-	// run the test whenever the executable changes
-	connect(fileWatcher, &QFileSystemWatcher::fileChanged, this, [this](const QString& path)
-	{
-		const QModelIndex m = executableModel->index(path);
-		if (m.isValid())
-		{
-			// only auto-run if the test is checked
-			if (m.data(QExecutableModel::AutorunRole).toBool())
-			{
-			    emit showMessage("Change detected: " + path + "...");
+    // update filewatcher when directory changes
+    connect(fileWatcher, &QFileSystemWatcher::directoryChanged, [this](const QString& path)
+    {
+        // This could be caused by the re-build of a watched test (which cause additionally cause the
+        // watcher to stop watching it), so just in case add all the test paths back.
+        this->fileWatcher->addPaths(executablePaths.filter(path));
+    });
 
-                            auto currentTime = QDateTime::currentDateTime();
-                            latestBuildChangeTime_[path] = currentTime;
+    // re-rerun tests when auto-testing is re-enabled
+    connect(executableModel, &QAbstractItemModel::dataChanged, this,
+            [this](const QModelIndex& topLeft, const QModelIndex& bottomRight, const QVector<int>& roles)
+            {
+                const QString path = topLeft.data(QExecutableModel::PathRole).toString();
+                const bool prevState = testsController_->autoRun(path);
 
-			    // add a little delay to avoid running multiple instances of the same test build,
-			    // and to avoid running the file before visual studio is done writing it.
-                            QTimer::singleShot(2000, [this, path, currentTime]
-                            {
-                                // Only run after latest update after timeout and not by previous triggers
-                                if (currentTime == latestBuildChangeTime_[path])
-                                {
-                                    emit runTestInThread(path, true);
-                                }
-                            });
-			}
-			else
-			{
-				executableModel->setData(m, ExecutableData::NOT_RUNNING, QExecutableModel::StateRole);
-			}
-		}
+                // Only re-run IFF the checkbox state goes from unchecked to checked AND
+                // the data has gotten out of date since the checkbox was off.
+                if (topLeft.data(QExecutableModel::AutorunRole).toBool() && !prevState)
+                {
+                    const QFileInfo gtestResult(testsController_->latestTestResultFile(path));
+                    const QFileInfo exe(path);
 
-	});
+                    if (gtestResult.lastModified() < exe.lastModified())
+                    {
+                        // out of date! re-run.
+                        emit showMessage(
+                            "Automatic testing enabled for: " + topLeft.data(Qt::DisplayRole).toString() +
+                            ". Re-running tests...");
+                        runTestInThread(topLeft.data(QExecutableModel::PathRole).toString(), true);
+                    }
+                }
 
-	// run test when signaled to. Queued connection so that multiple quick invocations will
-	// be collapsed together.
-	connect(this, &MainWindowPrivate::runTest, this, &MainWindowPrivate::runTestInThread, Qt::QueuedConnection);
+                // update previous state
+                testsController_->setAutoRun(path, topLeft.data(QExecutableModel::AutorunRole).toBool());
+            }, Qt::QueuedConnection);
 
-	// update filewatcher when directory changes
-	connect(fileWatcher, &QFileSystemWatcher::directoryChanged, [this](const QString& path)
-	{
-		// This could be caused by the re-build of a watched test (which cause additionally cause the
-		// watcher to stop watching it), so just in case add all the test paths back.
-		this->fileWatcher->addPaths(executablePaths.filter(path));
-	});
+    // filter test results when the filter is changed
+    connect(testCaseFilterEdit, &QLineEdit::textChanged, this, [this](const QString& text)
+    {
+        if (QRegExp(text).isValid())
+        {
+            testCaseProxyModel->setFilterRegExp(text);
+            if (testCaseProxyModel->rowCount())
+            {
+                for (int i = 0; i < testCaseProxyModel->columnCount(); ++i)
+                {
+                    testCaseTableView->resizeColumnToContents(i);
+                }
+            }
+        }
+    });
 
-	// re-rerun tests when auto-testing is re-enabled
-	connect(executableModel, &QAbstractItemModel::dataChanged, this, [this](const QModelIndex & topLeft, const QModelIndex & bottomRight, const QVector<int> & roles)
-	{
-		const QString path = topLeft.data(QExecutableModel::PathRole).toString();
-		const bool prevState = executableCheckedStateHash[path];
+    // create a failure model when a test is clicked
+    connect(testCaseTableView->selectionModel(), &QItemSelectionModel::currentChanged,
+            [this](const QModelIndex& current, const QModelIndex&)
+            {
+                if (!current.isValid())
+                    return;
 
-		// Only re-run IFF the checkbox state goes from unchecked to checked AND
-		// the data has gotten out of date since the checkbox was off.
-		if (topLeft.data(QExecutableModel::AutorunRole).toBool() && !prevState)
-		{
-			const QFileInfo gtestResult(latestGtestResultPath(path));
-			const QFileInfo exe(path);
+                auto index = testCaseProxyModel->mapToSource(current);
+                if (index.row() < GTestModel::ResultAndTime)
+                {
+                    // Auto-Select the first failure model
+                    index = testCaseProxyModel->sourceModel()->index(index.row(), GTestModel::ResultAndTime, index.parent());
+                }
+                const FlatDomeItemPtr item = static_cast<GTestModel *>(testCaseProxyModel->sourceModel())->
+                        itemForIndex(index);
 
-                        if (gtestResult.lastModified() < exe.lastModified())
-			{
-				// out of date! re-run.
-				emit showMessage("Automatic testing enabled for: " + topLeft.data(Qt::DisplayRole).toString() + ". Re-running tests...");
-				runTestInThread(topLeft.data(QExecutableModel::PathRole).toString(), true);
-			}
-		}
+                if (index.isValid())
+                {
+                    if (index.data(GTestModel::FailureRole).toInt() > 0)
+                        failureTreeView->header()->show();
+                    else
+                        failureTreeView->header()->hide();
+                }
 
-		// update previous state
-		executableCheckedStateHash[path] = topLeft.data(QExecutableModel::AutorunRole).toBool();
-	}, Qt::QueuedConnection);
+                failureTreeView->setSortingEnabled(false);
+                delete failureProxyModel->sourceModel();
+                failureProxyModel->setSourceModel(new GTestFailureModel(item));
+                failureTreeView->setSortingEnabled(true);
+                for (int i = 0; i < failureProxyModel->columnCount(); ++i)
+                {
+                    failureTreeView->resizeColumnToContents(i);
+                }
+            });
 
-	// filter test results when the filter is changed
-	connect(testCaseFilterEdit, &QLineEdit::textChanged, this, [this](const QString& text)
-	{
-		if (QRegExp(text).isValid())
-		{
-			testCaseProxyModel->setFilterRegExp(text);
-			if(testCaseProxyModel->rowCount())
-			{
-				for (int i = 0; i < testCaseProxyModel->columnCount(); ++i)
-				{
-					testCaseTableView->resizeColumnToContents(i);
-				}
-			}
-		}
-	});
+    // open failure dock on test double-click
+    connect(testCaseTableView, &QTableView::doubleClicked, [this](const QModelIndex& index)
+    {
+        if (index.isValid())
+            failureDock->show();
+    });
 
-	// create a failure model when a test is clicked
-	connect(testCaseTableView->selectionModel(), &QItemSelectionModel::selectionChanged, [this](const QItemSelection& selected, const QItemSelection& deselected)
-	{
-		if (selected.indexes().empty())
-			return;
-
-                auto index = testCaseProxyModel->mapToSource(selected.indexes().first());
-                //TODO: check if works with history
-                FlatDomeItemPtr item = static_cast<GTestModel*>(testCaseProxyModel->sourceModel())->itemForIndex(index);
-
-		if (index.isValid())
-		{
-			if (index.data(GTestModel::FailureRole).toInt() > 0)
-				failureTreeView->header()->show();
-			else
-				failureTreeView->header()->hide();
-		}
-
-		failureTreeView->setSortingEnabled(false);
-		delete failureProxyModel->sourceModel();
-		failureProxyModel->setSourceModel(new GTestFailureModel(item));
-		failureTreeView->setSortingEnabled(true);
-		for (int i = 0; i < failureProxyModel->columnCount(); ++i)
-		{
-			failureTreeView->resizeColumnToContents(i);
-		}
-	});
-
-	// open failure dock on test double-click
-        connect(testCaseTableView, &QTableView::doubleClicked, [this](const QModelIndex& index)
-	{
-		if (index.isValid())
-			failureDock->show();
-	});
-
-	// copy failure line to clipboard (to support IDE Ctrl-G + Ctrl-V)
-	// also, highlight it in the console model
-        connect(failureTreeView, &QTableView::clicked, [this](const QModelIndex& index)
-	{
-		if (index.isValid())
-		{
-			QApplication::clipboard()->setText(index.data(GTestFailureModel::LineRole).toString());
-			// yay, the path strings are TOTALLY different between the different OS's
+    // copy failure line to clipboard (to support IDE Ctrl-G + Ctrl-V)
+    // also, highlight it in the console model
+    connect(failureTreeView, &QTableView::clicked, [this](const QModelIndex& index)
+    {
+        if (index.isValid())
+        {
+            QApplication::clipboard()->setText(index.data(GTestFailureModel::LineRole).toString());
+            // yay, the path strings are TOTALLY different between the different OS's
 #ifdef _MSC_VER
-			QString findString = QDir::toNativeSeparators(index.data(GTestFailureModel::PathRole).toString()) + "(" + index.data(GTestFailureModel::LineRole).toString() + ")";
+            QString findString = QDir::toNativeSeparators(index.data(GTestFailureModel::PathRole).toString()) + "(" +
+                                 index.data(GTestFailureModel::LineRole).toString() + ")";
 #else
 			QString findString = index.data(GTestFailureModel::PathRole).toString() + ":" + index.data(GTestFailureModel::LineRole).toString();
 #endif
-			consoleTextEdit->find(findString, QTextDocument::FindBackward);
-			consoleTextEdit->find(findString);
-			scrollToConsoleCursor();
-		}
-	});
-
-	// open file on double-click
-        connect(failureTreeView, &QTableView::doubleClicked, [this](const QModelIndex& index)
-	{
-		if (index.isValid())
-			QDesktopServices::openUrl(QUrl::fromLocalFile(index.data(GTestFailureModel::PathRole).toString()));
-	});
-
-	// display test output in the console window
-	connect(this, &MainWindowPrivate::testOutputReady, this, [this](const QString& text)
-	{
-		// add the new test output
-		consoleTextEdit->moveCursor(QTextCursor::End);
-		consoleTextEdit->insertPlainText(text);
-		consoleTextEdit->moveCursor(QTextCursor::End);
-		consoleTextEdit->ensureCursorVisible();
-	}, Qt::QueuedConnection);
-
-	// update test progress
-	connect(this, &MainWindowPrivate::testProgress, this, [this](const QString& test, const int complete, const int total)
-	{
-		const QModelIndex index = executableModel->index(test);
-		executableModel->setData(index, static_cast<double>(complete) / total, QExecutableModel::ProgressRole);
-	});
-
-	// open the GUI when a tray message is clicked
-	connect(systemTrayIcon, &QSystemTrayIcon::messageClicked, [this]
-	{
-		q_ptr->setWindowState(Qt::WindowActive);
-		q_ptr->raise();
-		if (!mostRecentFailurePath.isEmpty())
-			selectTest(mostRecentFailurePath);
-	});
-
-	// find the previous failure when the button is pressed
-	connect(consolePrevFailureButton, &QPushButton::pressed, [this]
-	{
-		static const QRegularExpression regex("\\[\\s+RUN\\s+\\].*?[\n](.*?): ((?!OK).)*?\\[\\s+FAILED\\s+\\]", QRegularExpression::MultilineOption | QRegularExpression::DotMatchesEverythingOption);
-		auto matches = regex.globalMatch(consoleTextEdit->toPlainText());
-
-		QRegularExpressionMatch match;
-		QTextCursor c = consoleTextEdit->textCursor();
-
-		while(matches.hasNext())
-		{
-			auto nextMatch = matches.peekNext();
-			if(nextMatch.capturedEnd() >= c.position())
-			{
-				break;
-			}
-			match = matches.next();
-		}
-
-		if(match.capturedStart() > 0)
-		{
-			c.setPosition(match.capturedStart(1));
-			consoleTextEdit->setTextCursor(c);
-			scrollToConsoleCursor();
-			c.setPosition(match.capturedEnd(1), QTextCursor::KeepAnchor);
-			consoleTextEdit->setTextCursor(c);
-		}
-	});
-
-	// find the next failure when the button is pressed
-	connect(consoleNextFailureButton, &QPushButton::pressed, [this]
-	{
-		static const QRegularExpression regex("\\[\\s+RUN\\s+\\].*?[\n](.*?): ((?!OK).)*?\\[\\s+FAILED\\s+\\]", QRegularExpression::MultilineOption | QRegularExpression::DotMatchesEverythingOption);
-		auto matches = regex.globalMatch(consoleTextEdit->toPlainText());
-
-		QRegularExpressionMatch match;
-		QTextCursor c = consoleTextEdit->textCursor();
-
-		while(matches.hasNext())
-		{
-			match = matches.next();
-			if(match.capturedEnd() >= c.position())
-			{
-				if(matches.hasNext())
-					match = matches.next();
-				break;
-			}
-		}
-
-		if(match.capturedStart() > 0)
-		{
-			c.setPosition(match.capturedStart(1));
-			consoleTextEdit->setTextCursor(c);
-			scrollToConsoleCursor();
-			c.setPosition(match.capturedEnd(1), QTextCursor::KeepAnchor);
-			consoleTextEdit->setTextCursor(c);
-		}
-	});
-}
-
-//--------------------------------------------------------------------------------------------------
-//	FUNCTION: xmlPath
-//--------------------------------------------------------------------------------------------------
-QString MainWindowPrivate::xmlPath(const QString& testPath, const bool create)
-{
-	const QString name = QFileInfo(testPath).baseName();
-	const QString hash = QCryptographicHash::hash(testPath.toLatin1(), QCryptographicHash::Md5).toHex();
-    QString path = dataPath() + "/" + name + "_" + hash;
-    if (create)
-    {
-        (void)QDir(path).mkpath(".");
-    }
-    return path;
-}
-
-QString MainWindowPrivate::latestGtestResultPath(const QString& testPath)
-{
-    const QString basicPath = xmlPath(testPath);
-    if (testLatestTestRun_.find(testPath) == testLatestTestRun_.end())
-    {
-        const QStringList results = QDir(basicPath).entryList(QDir::Dirs, QDir::Time);
-        if (results.isEmpty())
-        {
-            return {};
+            consoleTextEdit->find(findString, QTextDocument::FindBackward);
+            consoleTextEdit->find(findString);
+            scrollToConsoleCursor();
         }
-        testLatestTestRun_[testPath] = results[0];
-    }
-    return basicPath + "/" + testLatestTestRun_[testPath] + "/" + GTEST_RESULT_NAME;
+    });
+
+    // open file on double-click
+    connect(failureTreeView, &QTableView::doubleClicked, [this](const QModelIndex& index)
+    {
+        if (index.isValid())
+            QDesktopServices::openUrl(QUrl::fromLocalFile(index.data(GTestFailureModel::PathRole).toString()));
+    });
+
+    // display test output in the console window
+    connect(this, &MainWindowPrivate::testOutputReady, this, [this](const QString& text)
+    {
+        // add the new test output
+        consoleTextEdit->moveCursor(QTextCursor::End);
+        consoleTextEdit->insertPlainText(text);
+        consoleTextEdit->moveCursor(QTextCursor::End);
+        consoleTextEdit->ensureCursorVisible();
+    }, Qt::QueuedConnection);
+
+    // update test progress
+    connect(this, &MainWindowPrivate::testProgress, this,
+            [this](const QString& test, const int complete, const int total)
+            {
+                const QModelIndex index = executableModel->index(test);
+                executableModel->setData(index, static_cast<double>(complete) / total, QExecutableModel::ProgressRole);
+            });
+
+    // open the GUI when a tray message is clicked
+    connect(systemTrayIcon, &QSystemTrayIcon::messageClicked, [this]
+    {
+        q_ptr->setWindowState(Qt::WindowActive);
+        q_ptr->raise();
+        if (!mostRecentFailurePath.isEmpty())
+            selectTest(mostRecentFailurePath);
+    });
+
+    // find the previous failure when the button is pressed
+    connect(consolePrevFailureButton, &QPushButton::pressed, [this]
+    {
+        static const QRegularExpression regex("\\[\\s+RUN\\s+\\].*?[\n](.*?): ((?!OK).)*?\\[\\s+FAILED\\s+\\]",
+                                              QRegularExpression::MultilineOption |
+                                              QRegularExpression::DotMatchesEverythingOption);
+        auto matches = regex.globalMatch(consoleTextEdit->toPlainText());
+
+        QRegularExpressionMatch match;
+        QTextCursor c = consoleTextEdit->textCursor();
+
+        while (matches.hasNext())
+        {
+            auto nextMatch = matches.peekNext();
+            if (nextMatch.capturedEnd() >= c.position())
+            {
+                break;
+            }
+            match = matches.next();
+        }
+
+        if (match.capturedStart() > 0)
+        {
+            c.setPosition(match.capturedStart(1));
+            consoleTextEdit->setTextCursor(c);
+            scrollToConsoleCursor();
+            c.setPosition(match.capturedEnd(1), QTextCursor::KeepAnchor);
+            consoleTextEdit->setTextCursor(c);
+        }
+    });
+
+    // find the next failure when the button is pressed
+    connect(consoleNextFailureButton, &QPushButton::pressed, [this]
+    {
+        static const QRegularExpression regex("\\[\\s+RUN\\s+\\].*?[\n](.*?): ((?!OK).)*?\\[\\s+FAILED\\s+\\]",
+                                              QRegularExpression::MultilineOption |
+                                              QRegularExpression::DotMatchesEverythingOption);
+        auto matches = regex.globalMatch(consoleTextEdit->toPlainText());
+
+        QRegularExpressionMatch match;
+        QTextCursor c = consoleTextEdit->textCursor();
+
+        while (matches.hasNext())
+        {
+            match = matches.next();
+            if (match.capturedEnd() >= c.position())
+            {
+                if (matches.hasNext())
+                    match = matches.next();
+                break;
+            }
+        }
+
+        if (match.capturedStart() > 0)
+        {
+            c.setPosition(match.capturedStart(1));
+            consoleTextEdit->setTextCursor(c);
+            scrollToConsoleCursor();
+            c.setPosition(match.capturedEnd(1), QTextCursor::KeepAnchor);
+            consoleTextEdit->setTextCursor(c);
+        }
+    });
 }
 
 //--------------------------------------------------------------------------------------------------
 //	FUNCTION: addTestExecutable
 //--------------------------------------------------------------------------------------------------
-void MainWindowPrivate::addTestExecutable(const QString& path, const QString& name, const QString& testDriver, const bool autorun,
-                                          QDateTime lastModified, const QString& filter /*= ""*/, const int repeat /*= 0*/,
-                                          const Qt::CheckState runDisabled /*= Qt::Unchecked*/, const Qt::CheckState failFast /*= Qt::Unchecked*/, const Qt::CheckState shuffle /*= Qt::Unchecked*/,
+void MainWindowPrivate::addTestExecutable(const QString& path, const QString& name, const QString& testDriver,
+                                          const bool autorun,
+                                          QDateTime lastModified, const QString& filter /*= ""*/,
+                                          const int repeat /*= 0*/,
+                                          const Qt::CheckState runDisabled /*= Qt::Unchecked*/,
+                                          const Qt::CheckState failFast /*= Qt::Unchecked*/,
+                                          const Qt::CheckState shuffle /*= Qt::Unchecked*/,
                                           const int randomSeed /*= 0*/, const QString& otherArgs /*= ""*/)
 {
-	const QFileInfo fileinfo(path);
+    const QFileInfo fileinfo(path);
 
-	if (!fileinfo.exists())
-		return;
+    if (!fileinfo.exists())
+        return;
 
-        if (!fileinfo.isExecutable() || !fileinfo.isFile())
-		return;
+    if (!fileinfo.isExecutable() || !fileinfo.isFile())
+        return;
 
-	if (executableModel->index(path).isValid())
-		return;
+    if (executableModel->index(path).isValid())
+        return;
 
-	if (lastModified == QDateTime())
-		lastModified = fileinfo.lastModified();
+    if (lastModified == QDateTime())
+        lastModified = fileinfo.lastModified();
 
-	executableCheckedStateHash[path] = autorun;
+    testsController_->addTest(path);
+    testsController_->setAutoRun(path, autorun);
 
-	const QModelIndex newRow = executableModel->insertRow(QModelIndex(), path);
+    const QModelIndex newRow = executableModel->insertRow(QModelIndex(), path);
 
-	executableModel->setData(newRow, 0, QExecutableModel::ProgressRole);
-	executableModel->setData(newRow, path, QExecutableModel::PathRole);
-        executableModel->setData(newRow, name, QExecutableModel::NameRole);
-        executableModel->setData(newRow, testDriver, QExecutableModel::TestDriverRole);
-	executableModel->setData(newRow, autorun, QExecutableModel::AutorunRole);
-	executableModel->setData(newRow, lastModified, QExecutableModel::LastModifiedRole);
-	executableModel->setData(newRow, ExecutableData::NOT_RUNNING, QExecutableModel::StateRole);
-	executableModel->setData(newRow, filter, QExecutableModel::FilterRole);
-	executableModel->setData(newRow, repeat, QExecutableModel::RepeatTestsRole);
-	executableModel->setData(newRow, runDisabled, QExecutableModel::RunDisabledTestsRole);
-        executableModel->setData(newRow, failFast, QExecutableModel::FailFastRole);
-	executableModel->setData(newRow, shuffle, QExecutableModel::ShuffleRole);
-	executableModel->setData(newRow, randomSeed, QExecutableModel::RandomSeedRole);
-	executableModel->setData(newRow, otherArgs, QExecutableModel::ArgsRole);
+    executableModel->setData(newRow, 0, QExecutableModel::ProgressRole);
+    executableModel->setData(newRow, path, QExecutableModel::PathRole);
+    executableModel->setData(newRow, name, QExecutableModel::NameRole);
+    executableModel->setData(newRow, testDriver, QExecutableModel::TestDriverRole);
+    executableModel->setData(newRow, autorun, QExecutableModel::AutorunRole);
+    executableModel->setData(newRow, lastModified, QExecutableModel::LastModifiedRole);
+    executableModel->setData(newRow, ExecutableData::NOT_RUNNING, QExecutableModel::StateRole);
+    executableModel->setData(newRow, filter, QExecutableModel::FilterRole);
+    executableModel->setData(newRow, repeat, QExecutableModel::RepeatTestsRole);
+    executableModel->setData(newRow, runDisabled, QExecutableModel::RunDisabledTestsRole);
+    executableModel->setData(newRow, failFast, QExecutableModel::FailFastRole);
+    executableModel->setData(newRow, shuffle, QExecutableModel::ShuffleRole);
+    executableModel->setData(newRow, randomSeed, QExecutableModel::RandomSeedRole);
+    executableModel->setData(newRow, otherArgs, QExecutableModel::ArgsRole);
 
-	fileWatcher->addPath(fileinfo.dir().canonicalPath());
-	fileWatcher->addPath(path);
-	executablePaths << path;
+    fileWatcher->addPath(fileinfo.dir().canonicalPath());
+    fileWatcher->addPath(path);
+    executablePaths << path;
 
-	const bool previousResults = loadTestResults(path, false);
-	const bool outOfDate = lastModified < fileinfo.lastModified();
+    const bool previousResults = loadTestResults(path, false);
+    const bool outOfDate = lastModified < fileinfo.lastModified();
 
-	executableTreeView->setCurrentIndex(newRow);
-	for (int i = 0; i < executableModel->columnCount(); i++)
-	{
-		executableTreeView->resizeColumnToContents(i);
-	}
+    executableTreeView->setCurrentIndex(newRow);
+    for (int i = 0; i < executableModel->columnCount(); i++)
+    {
+        executableTreeView->resizeColumnToContents(i);
+    }
 
-        testKillHandler_[path] = nullptr;
-	testRunningHash[path] = false;
-        latestBuildChangeTime_[path] = lastModified;
+    testKillHandler_[path] = nullptr;
+    testRunningHash[path] = false;
+    latestBuildChangeTime_[path] = lastModified;
 
-	// only run if test has run before and is out of date now
-        if (outOfDate && previousResults && autorun)
-	{
-		this->runTestInThread(path, false);
-	}
-	else if (outOfDate)
-	{
-		executableModel->setData(newRow, ExecutableData::NOT_RUNNING, QExecutableModel::StateRole);
-	}
+    // only run if test has run before and is out of date now
+    if (outOfDate && previousResults && autorun)
+    {
+        this->runTestInThread(path, false);
+    }
+    else if (outOfDate)
+    {
+        executableModel->setData(newRow, ExecutableData::NOT_RUNNING, QExecutableModel::StateRole);
+    }
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -589,248 +586,255 @@ void MainWindowPrivate::addTestExecutable(const QString& path, const QString& na
 //--------------------------------------------------------------------------------------------------
 void MainWindowPrivate::runTestInThread(const QString& pathToTest, bool notify)
 {
-	std::thread t([this, pathToTest, notify]
-	{
-		QEventLoop loop;
+    std::thread t([this, pathToTest, notify]
+    {
+        QEventLoop loop;
 
-		// kill the running test instance first if there is one
-		if (testRunningHash[pathToTest])
-		{
-                        emitKillTest(pathToTest);
+        // kill the running test instance first if there is one
+        if (testRunningHash[pathToTest])
+        {
+            emitKillTest(pathToTest);
 
-			std::unique_lock<std::mutex> lock(threadKillMutex);
-			threadKillCv.wait(lock, [&, pathToTest] {return !testRunningHash[pathToTest]; });
-		}
+            std::unique_lock<std::mutex> lock(threadKillMutex);
+            threadKillCv.wait(lock, [&, pathToTest]
+            {
+                return !testRunningHash[pathToTest];
+            });
+        }
 
-		testRunningHash[pathToTest] = true;
-                numberOfRunningTests_ += 1;
-                updateButtonsForRunningTests();
+        testRunningHash[pathToTest] = true;
+        numberOfRunningTests_ += 1;
+        updateButtonsForRunningTests();
 
-		executableModel->setData(executableModel->index(pathToTest), ExecutableData::RUNNING, QExecutableModel::StateRole);
+        executableModel->setData(executableModel->index(pathToTest), ExecutableData::RUNNING,
+                                 QExecutableModel::StateRole);
 
-		const QFileInfo info(pathToTest);
-                executableModel->setData(executableModel->index(pathToTest), info.lastModified(), QExecutableModel::LastModifiedRole);
-		const QString testName = executableModel->index(pathToTest).data(QExecutableModel::NameRole).toString();
-		QProcess testProcess;
+        const QFileInfo info(pathToTest);
+        executableModel->setData(executableModel->index(pathToTest), info.lastModified(),
+                                 QExecutableModel::LastModifiedRole);
+        const QString testName = executableModel->index(pathToTest).data(QExecutableModel::NameRole).toString();
+        QProcess testProcess;
 
-		bool first = true;
-		int tests = 0;
-		int progress = 0;
+        bool first = true;
+        int tests = 0;
+        int progress = 0;
 
 
-                auto tearDown = [&, pathToTest](const QString& output)
+        auto tearDown = [&, pathToTest](const QString& output)
+        {
+            emit testOutputReady(output);
+            emit testProgress(pathToTest, 0, 0);
+
+            testKillHandler_[pathToTest] = nullptr;
+            testRunningHash[pathToTest] = false;
+            numberOfRunningTests_ -= 1;
+            updateButtonsForRunningTests();
+            threadKillCv.notify_all();
+
+            loop.exit();
+        };
+
+        // when the process finished, read any remaining output then quit the loop
+        connect(&testProcess, static_cast<void (QProcess::*)(int, QProcess::ExitStatus)>(&QProcess::finished), &loop,
+                [&, pathToTest]
+        (const int exitCode, const QProcess::ExitStatus exitStatus)
                 {
-                    emit testOutputReady(output);
-                    emit testProgress(pathToTest, 0, 0);
+                    QString output = testProcess.readAllStandardOutput();
+                    // 0 for success and 1 if test have failed -> in both cases a result xml was generated
+                    if (exitStatus == QProcess::NormalExit && (exitCode == 0 || exitCode == 1))
+                    {
+                        output.append(
+                            "\nTEST RUN COMPLETED: " + QDateTime::currentDateTime().toString("yyyy-MMM-dd hh:mm:ss.zzz")
+                            + " " + testName + "\n\n");
+                        emit testResultsReady(pathToTest, notify);
+                    }
+                    else
+                    {
+                        output.append(
+                            "\nTEST RUN EXITED WITH ERRORS: " + QDateTime::currentDateTime().toString(
+                                "yyyy-MMM-dd hh:mm:ss.zzz") + " " + testName + "\n\n");
+                        executableModel->setData(executableModel->index(pathToTest), ExecutableData::NOT_RUNNING,
+                                                 QExecutableModel::StateRole);
+                    }
 
-                    testKillHandler_[pathToTest] = nullptr;
-                    testRunningHash[pathToTest] = false;
-                    numberOfRunningTests_ -= 1;
-                    updateButtonsForRunningTests();
-                    threadKillCv.notify_all();
+                    tearDown(output);
+                }, Qt::QueuedConnection);
 
-                    loop.exit();
-                };
+        testKillHandler_[pathToTest] = new KillTestWrapper(&testProcess);
 
-		// when the process finished, read any remaining output then quit the loop
-                connect(&testProcess, static_cast<void (QProcess::*)(int, QProcess::ExitStatus)>(&QProcess::finished), &loop, [&, pathToTest]
-                        (const int exitCode, const QProcess::ExitStatus exitStatus)
-		{
-			QString output = testProcess.readAllStandardOutput();
-                        // 0 for success and 1 if test have failed -> in both cases a result xml was generated
-                        if (exitStatus == QProcess::NormalExit && (exitCode == 0 || exitCode == 1))
-			{
-                                output.append("\nTEST RUN COMPLETED: " + QDateTime::currentDateTime().toString("yyyy-MMM-dd hh:mm:ss.zzz") + " " + testName + "\n\n");
-				emit testResultsReady(pathToTest, notify);
-			}
-			else
-			{
-                                output.append("\nTEST RUN EXITED WITH ERRORS: " + QDateTime::currentDateTime().toString("yyyy-MMM-dd hh:mm:ss.zzz") + " " + testName + "\n\n");
-				executableModel->setData(executableModel->index(pathToTest), ExecutableData::NOT_RUNNING, QExecutableModel::StateRole);
-			}
-
-                        tearDown(output);
-		}, Qt::QueuedConnection);
-
-                testKillHandler_[pathToTest] = new KillTestWrapper(&testProcess);
-
-		// get killed if asked to do so
-                connect(testKillHandler_[pathToTest].load(), &KillTestWrapper::killTest, &loop, [&, pathToTest]
-		{
-                        // Try at least a few times to terminate gracefully
-                        // If User uses "Kill All Tests" the TestDriver can be in a state,
-                        // where he is not ready to receive the "terminate" command, yet.
-                        bool terminated = false;
-                        for (int i = 0; i < 10; ++i)
-                        {
-                            // terminate over std::in, as testProcess.terminate() sends WM_CLOSE under windows that is complex to catch
-                            testProcess.write("terminate\n");
-                            testProcess.waitForBytesWritten();
-                            // Give 0.5s to finish
-                            if (testProcess.waitForFinished(500))
-                            {
-                                terminated = true;
-                                break;
-                            }
-                        }
-                        if (!terminated)
-                        {
-                            testProcess.kill();
-                            testProcess.waitForFinished();
-                        }
-			QString output = testProcess.readAllStandardOutput();
-                        output.append("\nTEST RUN KILLED: " + QDateTime::currentDateTime().toString("yyyy-MMM-dd hh:mm:ss.zzz") + " " + testName + "\n\n");
-
-			executableModel->setData(executableModel->index(pathToTest), ExecutableData::NOT_RUNNING, QExecutableModel::StateRole);
-                        tearDown(output);
-		}, Qt::QueuedConnection);
-
-
-                // Register killTest before lock -> possible to Kill All Tests
-		const int numberLock = runTestsSynchronousAction_->isChecked() ? MAX_PARALLEL_TEST_EXEC : 1;
-                const SemaphoreLocker runTestThreadSynchronousLock(runTestParallelSemaphore_, numberLock);
-                // Check if asked to be killed
-                if (!testKillHandler_[pathToTest].load() || testKillHandler_[pathToTest].load()->isKillRequested())
+        // get killed if asked to do so
+        connect(testKillHandler_[pathToTest].load(), &KillTestWrapper::killTest, &loop, [&, pathToTest]
+        {
+            // Try at least a few times to terminate gracefully
+            // If User uses "Kill All Tests" the TestDriver can be in a state,
+            // where he is not ready to receive the "terminate" command, yet.
+            bool terminated = false;
+            for (int i = 0; i < 10; ++i)
+            {
+                // terminate over std::in, as testProcess.terminate() sends WM_CLOSE under windows that is complex to catch
+                testProcess.write("terminate\n");
+                testProcess.waitForBytesWritten();
+                // Give 0.5s to finish
+                if (testProcess.waitForFinished(500))
                 {
-                    executableModel->setData(executableModel->index(pathToTest), ExecutableData::NOT_RUNNING, QExecutableModel::StateRole);
-                    tearDown("");
-                    return;
+                    terminated = true;
+                    break;
                 }
+            }
+            if (!terminated)
+            {
+                testProcess.kill();
+                testProcess.waitForFinished();
+            }
+            QString output = testProcess.readAllStandardOutput();
+            output.append(
+                "\nTEST RUN KILLED: " + QDateTime::currentDateTime().toString("yyyy-MMM-dd hh:mm:ss.zzz") + " " +
+                testName + "\n\n");
+
+            executableModel->setData(executableModel->index(pathToTest), ExecutableData::NOT_RUNNING,
+                                     QExecutableModel::StateRole);
+            tearDown(output);
+        }, Qt::QueuedConnection);
 
 
-                QString testResultDirName;
-                if (enableTestHistoryAction_->isChecked())
-                {
-                    testResultDirName = QDateTime::currentDateTime().toString(DATE_FORMAT);
-                }
-                else
-                {
-                    testResultDirName = LATEST_RESULT_DIR_NAME;
-                }
-		const QString copyResultDir = xmlPath(pathToTest, true) + "/" + testResultDirName;
-                QDir(copyResultDir).removeRecursively();
-                (void)QDir(copyResultDir).mkpath(".");
-                testLatestTestRun_[pathToTest] = testResultDirName;
+        // Register killTest before lock -> possible to Kill All Tests
+        const int numberLock = runTestsSynchronousAction_->isChecked() ? MAX_PARALLEL_TEST_EXEC : 1;
+        const SemaphoreLocker runTestThreadSynchronousLock(runTestParallelSemaphore_, numberLock);
+        // Check if asked to be killed
+        if (!testKillHandler_[pathToTest].load() || testKillHandler_[pathToTest].load()->isKillRequested())
+        {
+            executableModel->setData(executableModel->index(pathToTest), ExecutableData::NOT_RUNNING,
+                                     QExecutableModel::StateRole);
+            tearDown("");
+            return;
+        }
 
+        const QString outputDir = xmlPath(pathToTest, true);
+        const QString latestCopyDir = outputDir + "/" + LATEST_RESULT_DIR_NAME;
+        QDir(latestCopyDir).removeRecursively();
+        (void) QDir(latestCopyDir).mkpath(".");
 
-		// SET GTEST ARGS
-		const QModelIndex index = executableModel->index(pathToTest);
-		const QString testDriver = executableModel->data(index, QExecutableModel::TestDriverRole).toString();
+        // SET GTEST ARGS
+        const QModelIndex index = executableModel->index(pathToTest);
+        const QString testDriver = executableModel->data(index, QExecutableModel::TestDriverRole).toString();
 
-                QStringList arguments;
+        QStringList arguments;
 
-                arguments << testDriver;
-                arguments << "-C";
-                arguments << info.dir().dirName();
-                arguments << "--output-dir";
-                arguments << copyResultDir;
+        arguments << testDriver;
+        arguments << "-C";
+        arguments << info.dir().dirName();
+        arguments << "--output-dir";
+        arguments << latestCopyDir;
 
-                if (pipeAllTestOutput_->isChecked())
-                {
-                    arguments << "--pipe-log";
-                }
+        if (pipeAllTestOutput_->isChecked())
+        {
+            arguments << "--pipe-log";
+        }
 
-                arguments << "--gtest_output=xml:\"" + copyResultDir + "/" + GTEST_RESULT_NAME + "\"";
+        const auto currentTime = QDateTime::currentDateTime().toString(DATE_FORMAT);
+        const QString gtestFileName = outputDir + "/" + currentTime + "_" + GTEST_RESULT_NAME;
+        arguments << "--gtest_output=xml:\"" + gtestFileName + "\"";
 
-		const QString filter = executableModel->data(index, QExecutableModel::FilterRole).toString();
-		if (!filter.isEmpty()) arguments << "--gtest_filter=" + filter;
+        const QString filter = executableModel->data(index, QExecutableModel::FilterRole).toString();
+        if (!filter.isEmpty()) arguments << "--gtest_filter=" + filter;
 
-		const QString repeat = executableModel->data(index, QExecutableModel::RepeatTestsRole).toString();
-		if (repeat != "0" && repeat != "1") arguments << "--gtest_repeat=" + repeat;
-		int repeatCount = 1;
-		if (repeat.toInt() > 1) repeatCount = repeat.toInt();
+        const QString repeat = executableModel->data(index, QExecutableModel::RepeatTestsRole).toString();
+        if (repeat != "0" && repeat != "1") arguments << "--gtest_repeat=" + repeat;
+        int repeatCount = 1;
+        if (repeat.toInt() > 1) repeatCount = repeat.toInt();
 
-		const int runDisabled = executableModel->data(index, QExecutableModel::RunDisabledTestsRole).toInt();
-		if (runDisabled) arguments << "--gtest_also_run_disabled_tests";
+        const int runDisabled = executableModel->data(index, QExecutableModel::RunDisabledTestsRole).toInt();
+        if (runDisabled) arguments << "--gtest_also_run_disabled_tests";
 
-		const int failFast = executableModel->data(index, QExecutableModel::FailFastRole).toInt();
-                if (failFast) arguments << "--gtest_fail_fast";
+        const int failFast = executableModel->data(index, QExecutableModel::FailFastRole).toInt();
+        if (failFast) arguments << "--gtest_fail_fast";
 
-		const int shuffle = executableModel->data(index, QExecutableModel::ShuffleRole).toInt();
-		if (shuffle) arguments << "--gtest_shuffle";
+        const int shuffle = executableModel->data(index, QExecutableModel::ShuffleRole).toInt();
+        if (shuffle) arguments << "--gtest_shuffle";
 
-		const int seed = executableModel->data(index, QExecutableModel::RandomSeedRole).toInt();
-		if (shuffle) arguments << "--gtest_random_seed=" + QString::number(seed);
+        const int seed = executableModel->data(index, QExecutableModel::RandomSeedRole).toInt();
+        if (shuffle) arguments << "--gtest_random_seed=" + QString::number(seed);
 
-		const QString otherArgs = executableModel->data(index, QExecutableModel::ArgsRole).toString();
-		if(!otherArgs.isEmpty()) arguments << otherArgs;
+        const QString otherArgs = executableModel->data(index, QExecutableModel::ArgsRole).toString();
+        if (!otherArgs.isEmpty()) arguments << otherArgs;
 
 #ifdef Q_OS_WIN32
-                QString cmd = "\"" + currentRunEnvPath_ + "\" && " PYTHON;
-                // Start the test
-                testProcess.start(cmd, arguments);
+        QString cmd = "\"" + currentRunEnvPath_ + "\" && " PYTHON;
+        // Start the test
+        testProcess.start(cmd, arguments);
 #else
                 QString cmd = "bash -c \"source " + currentRunEnvPath_ + "; " PYTHON " " + arguments.join(" ") +  "\"";
                 // Start the test
                 testProcess.start(cmd);
 #endif
 
-		// get the first line of output. If we don't get it in a timely manner, the test is
-		// probably bugged out so kill it.
-		if (!testProcess.waitForReadyRead(10000))
-		{
-			testProcess.kill();
+        // get the first line of output. If we don't get it in a timely manner, the test is
+        // probably bugged out so kill it.
+        if (!testProcess.waitForReadyRead(10000))
+        {
+            testProcess.kill();
 
-                        executableModel->setData(executableModel->index(pathToTest), ExecutableData::NOT_RUNNING, QExecutableModel::StateRole);
-                        tearDown("");
-			return;
-		}
+            executableModel->setData(executableModel->index(pathToTest), ExecutableData::NOT_RUNNING,
+                                     QExecutableModel::StateRole);
+            tearDown("");
+            return;
+        }
 
-		// print test output as it becomes available
-		connect(&testProcess, &QProcess::readyReadStandardOutput, &loop, [&, pathToTest]
-		{
-			const QString output = testProcess.readAllStandardOutput();
+        // print test output as it becomes available
+        connect(&testProcess, &QProcess::readyReadStandardOutput, &loop, [&, pathToTest]
+        {
+            const QString output = testProcess.readAllStandardOutput();
 
-			// parse the first output line for the number of tests so we can
-			// keep track of progress
-			if (first)
-			{
-				// get the number of tests
-				static QRegExp rx("([0-9]+) tests");
-				(void)rx.indexIn(output);
-				tests = rx.cap(1).toInt();
-                                if (tests)
-                                {
-                                    first = false;
-                                    tests *= repeatCount;
-                                }
-                                else
-                                {
-                                    tests = 1;
-                                }
-			}
-			else
-			{
-				const QRegExp rx("(\\[.*OK.*\\]|\\[.*FAILED.*\\])");
-				if (rx.indexIn(output) != -1)
-					progress++;
-			}
+            // parse the first output line for the number of tests so we can
+            // keep track of progress
+            if (first)
+            {
+                // get the number of tests
+                static QRegExp rx("([0-9]+) tests");
+                (void) rx.indexIn(output);
+                tests = rx.cap(1).toInt();
+                if (tests)
+                {
+                    first = false;
+                    tests *= repeatCount;
+                }
+                else
+                {
+                    tests = 1;
+                }
+            }
+            else
+            {
+                const QRegExp rx(R"((\[.*OK.*\]|\[.*FAILED.*\]))");
+                if (rx.indexIn(output) != -1)
+                    progress++;
+            }
 
-			emit testProgress(pathToTest, progress, tests);
-			emit testOutputReady(output);
-		}, Qt::QueuedConnection);
+            emit testProgress(pathToTest, progress, tests);
+            emit testOutputReady(output);
+        }, Qt::QueuedConnection);
 
-		loop.exec();
-
-	});
-        t.detach();
+        loop.exec();
+    });
+    t.detach();
 }
 
 void MainWindowPrivate::updateButtonsForRunningTests() const
 {
-	const int value = numberOfRunningTests_;
+    const int value = numberOfRunningTests_;
     // Disable/Enable various UI buttons that are not supported if any test is running
     if (value == 1 || value == 0)
     {
-	    const bool areAnyRunning = value != 0;
+        const bool areAnyRunning = value != 0;
 
-        addRunEnvAction->setEnabled(!areAnyRunning);
-        removeRunEnvAction_->setEnabled(!areAnyRunning);
-        runEnvComboBox_->setEnabled(!areAnyRunning);
-        updateTestsButton->setEnabled(!areAnyRunning);
+        // invoke -> we could be running in another thread
+        QMetaObject::invokeMethod(addRunEnvAction, "setEnabled", Q_ARG(bool, !areAnyRunning));
+        QMetaObject::invokeMethod(removeRunEnvAction_, "setEnabled", Q_ARG(bool, !areAnyRunning));
+        QMetaObject::invokeMethod(runEnvComboBox_, "setEnabled", Q_ARG(bool, !areAnyRunning));
+        QMetaObject::invokeMethod(updateTestsButton, "setEnabled", Q_ARG(bool, !areAnyRunning));
 
-        killAllTestsAction_->setEnabled(areAnyRunning);
-        removeAllTestsAction_->setEnabled(!areAnyRunning);
+        QMetaObject::invokeMethod(killAllTestsAction_, "setEnabled", Q_ARG(bool, areAnyRunning));
+        QMetaObject::invokeMethod(removeAllTestsAction_, "setEnabled", Q_ARG(bool, !areAnyRunning));
 
         // If we want to update actions from ContextMenu -> we have to also check valid index
     }
@@ -841,119 +845,99 @@ void MainWindowPrivate::updateButtonsForRunningTests() const
 //--------------------------------------------------------------------------------------------------
 bool MainWindowPrivate::loadTestResults(const QString& testPath, const bool notify)
 {
-	const QFileInfo xmlInfo(latestGtestResultPath(testPath));
+    int numberErrors = 0;
+    if (!testsController_->loadLatestTestResult(testPath, numberErrors))
+    {
+        return false;
+    }
 
-	if (!xmlInfo.exists())
-	{
-		return false;
-	}
+    // if the test that just ran is selected, update the view
+    const QModelIndex index = executableTreeView->selectionModel()->currentIndex();
 
-	QDomDocument doc(testPath);
-	QFile file(xmlInfo.absoluteFilePath());
-	if (!file.open(QIODevice::ReadOnly))
-	{
-                QMessageBox::warning(q_ptr, "Error", "Could not open file located at: " + xmlInfo.absoluteFilePath());
-		return false;
-	}
-	if (!doc.setContent(&file))
-	{
-		file.close();
-		return false;
-	}
-	file.close();
+    if (index.data(QExecutableModel::PathRole).toString() == testPath)
+    {
+        selectTest(testPath);
+    }
 
-	testResultsHash[testPath] = doc;
+    // set executable icon
+    if (numberErrors)
+    {
+        executableModel->setData(executableModel->index(testPath), ExecutableData::FAILED, QExecutableModel::StateRole);
+        mostRecentFailurePath = testPath;
+        const QString name = executableModel->index(testPath).data(QExecutableModel::NameRole).toString();
+        // only show notifications AFTER the initial startup, otherwise the user
+        // could get a ton of messages every time they open the program. The messages
+        if (notify && notifyOnFailureAction->isChecked())
+        {
+            systemTrayIcon->showMessage("Test Failure",
+                                        name + " failed with " + QString::number(numberErrors) + " errors.");
+        }
+    }
+    else
+    {
+        executableModel->setData(executableModel->index(testPath), ExecutableData::PASSED, QExecutableModel::StateRole);
+        const QString name = executableModel->index(testPath).data(QExecutableModel::NameRole).toString();
+        if (notify && notifyOnSuccessAction->isChecked())
+        {
+            systemTrayIcon->showMessage("Test Successful", name + " ran with no errors.");
+        }
+    }
 
-	// if the test that just ran is selected, update the view
-	const QModelIndex index = executableTreeView->selectionModel()->currentIndex();
-
-	if (index.data(QExecutableModel::PathRole).toString() == testPath)
-	{
-		selectTest(testPath);
-	}
-
-	// set executable icon
-	const int numErrors = doc.elementsByTagName("testsuites").item(0).attributes().namedItem("failures").nodeValue().toInt();
-	if (numErrors)
-	{
-		executableModel->setData(executableModel->index(testPath), ExecutableData::FAILED, QExecutableModel::StateRole);
-		mostRecentFailurePath = testPath;
-		const QString name = executableModel->index(testPath).data(QExecutableModel::NameRole).toString();
-		// only show notifications AFTER the initial startup, otherwise the user
-		// could get a ton of messages every time they open the program. The messages
-		if (notify && notifyOnFailureAction->isChecked())
-		{
-			systemTrayIcon->showMessage("Test Failure", name + " failed with " + QString::number(numErrors) + " errors.");
-		}
-	}
-	else
-	{
-		executableModel->setData(executableModel->index(testPath), ExecutableData::PASSED, QExecutableModel::StateRole);
-		const QString name = executableModel->index(testPath).data(QExecutableModel::NameRole).toString();
-		if(notify && notifyOnSuccessAction->isChecked())
-		{
-			systemTrayIcon->showMessage("Test Successful", name + " ran with no errors.");
-		}
-	}
-
-	return true;
+    return true;
 }
 
 //--------------------------------------------------------------------------------------------------
 //	FUNCTION: selectTest
 //--------------------------------------------------------------------------------------------------
-void MainWindowPrivate::selectTest(const QString& testPath)
+void MainWindowPrivate::selectTest(const QString& testPath) const
 {
-	QModelIndex index = testCaseTableView->selectionModel()->currentIndex();
-        QString currentSelectedTestName;
-        if (index.isValid())
+    QModelIndex index = testCaseTableView->selectionModel()->currentIndex();
+    QString currentSelectedTestName;
+    if (index.isValid())
+    {
+        currentSelectedTestName = index.data(GTestModel::Name).toString();
+    }
+
+    // Delete the old failure models and make new ones
+    delete failureProxyModel->sourceModel();
+    testCaseTableView->setSortingEnabled(false);
+
+    testCaseProxyModel->setSourceModel(testsController_->gTestModel(testPath).get());
+    failureProxyModel->invalidate();
+    // TODO: disable for now -> see TODO add beginning
+    //testCaseTableView->setSortingEnabled(true);
+
+    // make sure the right entry is selected
+    executableTreeView->setCurrentIndex(executableModel->index(testPath));
+
+    // resize the columns
+    for (int i = 0; i < testCaseTableView->model()->columnCount(); i++)
+    {
+        testCaseTableView->resizeColumnToContents(i);
+    }
+
+    index = QModelIndex();
+    // reset the test case selection
+    if (!currentSelectedTestName.isEmpty())
+    {
+        index = testCaseTableView->model()->index(0, 0);
+        QModelIndexList matches = testCaseTableView->model()->
+                match(index, GTestModel::Name, currentSelectedTestName, 1);
+        if (!matches.empty())
         {
-            currentSelectedTestName = index.data(GTestModel::Name).toString();
+            index = matches.first();
         }
-
-	// Delete the old test case and failure models and make new ones
-        delete testCaseProxyModel->sourceModel();
-	delete failureProxyModel->sourceModel();
-	testCaseTableView->setSortingEnabled(false);
-
-        // TODO: init with overview Tests.xml
-        GTestModel* gtestModel = new GTestModel(testResultsHash[testPath]);
-        gtestModel->addTestResult(0, testResultsHash[testPath]);
-        testCaseProxyModel->setSourceModel(gtestModel);
-
-	failureProxyModel->clear();
-        // TODO: disable for now -> see TODO add beginning
-	//testCaseTableView->setSortingEnabled(true);
-
-	// make sure the right entry is selected
-	executableTreeView->setCurrentIndex(executableModel->index(testPath));
-	
- 	// resize the columns
-        for (int i = 0; i < testCaseTableView->model()->columnCount(); i++)
- 	{
-            testCaseTableView->resizeColumnToContents(i);
- 	}
-
-        index = QModelIndex();
-        // reset the test case selection
-        if (!currentSelectedTestName.isEmpty())
+        else
         {
-            index = testCaseTableView->model()->index(0, 0);
-            QModelIndexList matches = testCaseTableView->model()->match(index, GTestModel::Name, currentSelectedTestName, 1);
-            if (matches.size() > 0)
-            {
-                index = matches.first();
-            }
-            else
-            {
-                index = QModelIndex();
-            }
+            index = QModelIndex();
         }
+    }
 
-        if (index.isValid())
-	{
-		testCaseTableView->selectionModel()->setCurrentIndex(index, QItemSelectionModel::Select | QItemSelectionModel::Rows);
-	}
+    if (index.isValid())
+    {
+        testCaseTableView->selectionModel()->setCurrentIndex(
+            index, QItemSelectionModel::Select | QItemSelectionModel::Rows);
+    }
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -961,10 +945,10 @@ void MainWindowPrivate::selectTest(const QString& testPath)
 //--------------------------------------------------------------------------------------------------
 void MainWindowPrivate::saveSettings() const
 {
-	const QDir settingsDir(settingsPath());
+    const QDir settingsDir(settingsPath());
     if (!settingsDir.exists())
     {
-        (void)settingsDir.mkpath(".");
+        (void) settingsDir.mkpath(".");
     }
 
     saveCommonSettings(settingsPath() + "/" + "settings.json");
@@ -988,7 +972,6 @@ void MainWindowPrivate::saveCommonSettings(const QString& path) const
     QJsonObject options;
     options.insert("runTestsSynchronous", runTestsSynchronousAction_->isChecked());
     options.insert("pipeAllTestOutput", pipeAllTestOutput_->isChecked());
-    options.insert("enableTestHistory", enableTestHistoryAction_->isChecked());
     options.insert("notifyOnFailure", notifyOnFailureAction->isChecked());
     options.insert("notifyOnSuccess", notifyOnSuccessAction->isChecked());
     options.insert("theme", themeActionGroup->checkedAction()->objectName());
@@ -1018,7 +1001,7 @@ QString MainWindowPrivate::pathToCurrenRunEnvSettings() const
 
 void MainWindowPrivate::saveTestSettingsForCurrentRunEnv() const
 {
-	const QString path = pathToCurrenRunEnvSettings();
+    const QString path = pathToCurrenRunEnvSettings();
     if (path.isEmpty())
     {
         return;
@@ -1111,10 +1094,9 @@ void MainWindowPrivate::loadCommonSettings(const QString& path)
     QJsonObject options = root["options"].toObject();
     runTestsSynchronousAction_->setChecked(options["runTestsSynchronous"].toBool());
     pipeAllTestOutput_->setChecked(options["pipeAllTestOutput"].toBool());
-    enableTestHistoryAction_->setChecked(options["enableTestHistory"].toBool());
     notifyOnFailureAction->setChecked(options["notifyOnFailure"].toBool());
     notifyOnSuccessAction->setChecked(options["notifyOnSuccess"].toBool());
-    themeMenu->findChild<QAction*>(options["theme"].toString())->trigger();
+    themeMenu->findChild<QAction *>(options["theme"].toString())->trigger();
     currentRunEnvPath_ = options["currentRunEnvPath"].toString();
     removeRunEnvAction_->setEnabled(!currentRunEnvPath_.isEmpty());
 }
@@ -1147,20 +1129,21 @@ void MainWindowPrivate::loadTestSettings(const QString& path)
     {
         QJsonObject test = testRef.toObject();
 
-        QString path = test["path"].toString();
+        QString pathInner = test["path"].toString();
         QString name = test["name"].toString();
         QString testDriver = test["testDriver"].toString();
         const bool autorun = test["autorun"].toBool();
         const QDateTime lastModified = QDateTime::fromString(test["lastModified"].toString(), DATE_FORMAT);
         QString filter = test["filter"].toString();
         const int repeat = test["repeat"].toInt();
-        const Qt::CheckState runDisabled = static_cast<Qt::CheckState>(test["runDisabled"].toInt());
-        const Qt::CheckState failFast = static_cast<Qt::CheckState>(test["failFast"].toInt());
-        const Qt::CheckState shuffle = static_cast<Qt::CheckState>(test["shuffle"].toInt());
+        const auto runDisabled = static_cast<Qt::CheckState>(test["runDisabled"].toInt());
+        const auto failFast = static_cast<Qt::CheckState>(test["failFast"].toInt());
+        const auto shuffle = static_cast<Qt::CheckState>(test["shuffle"].toInt());
         const int seed = test["seed"].toInt();
         QString args = test["args"].toString();
 
-        addTestExecutable(path, name, testDriver, autorun, lastModified, filter, repeat, runDisabled, failFast, shuffle, seed, args);
+        addTestExecutable(pathInner, name, testDriver, autorun, lastModified, filter, repeat, runDisabled, failFast,
+                          shuffle, seed, args);
     }
 }
 
@@ -1172,7 +1155,8 @@ void MainWindowPrivate::removeAllTest(const bool confirm)
         return;
     }
 
-    if (confirm || QMessageBox::question(this->q_ptr, "Remove All Test?", "Do you want to remove all tests?", QMessageBox::Yes, QMessageBox::No) == QMessageBox::Yes)
+    if (confirm || QMessageBox::question(this->q_ptr, "Remove All Test?", "Do you want to remove all tests?",
+                                         QMessageBox::Yes, QMessageBox::No) == QMessageBox::Yes)
     {
         for (int i = 0; i < executableModel->rowCount(); ++i)
         {
@@ -1180,17 +1164,15 @@ void MainWindowPrivate::removeAllTest(const bool confirm)
             QString path = index.data(QExecutableModel::PathRole).toString();
 
             // remove all data related to this test
+            testsController_->removeTest(path);
             executablePaths.removeAll(path);
-            testResultsHash.remove(path);
             fileWatcher->removePath(path);
         }
 
         const QAbstractItemModel* oldFailureModel = failureProxyModel->sourceModel();
-        const QAbstractItemModel* oldtestCaseModel = testCaseProxyModel->sourceModel();
         failureProxyModel->setSourceModel(new GTestFailureModel(nullptr));
-        testCaseProxyModel->setSourceModel(new GTestModel(QDomDocument()));
+        testCaseProxyModel->setSourceModel(testsController_->gTestModel(QString()).get());
         delete oldFailureModel;
-        delete oldtestCaseModel;
         executableModel->removeRows(0, executableModel->rowCount());
     }
 }
@@ -1198,32 +1180,32 @@ void MainWindowPrivate::removeAllTest(const bool confirm)
 //--------------------------------------------------------------------------------------------------
 //	FUNCTION: removeTest
 //--------------------------------------------------------------------------------------------------
-void MainWindowPrivate::removeTest(const QModelIndex &index, const bool confirm)
+void MainWindowPrivate::removeTest(const QModelIndex& index, const bool confirm)
 {
-	if (!index.isValid())
-		return;
+    if (!index.isValid())
+        return;
 
-	const QString path = index.data(QExecutableModel::PathRole).toString();
+    const QString path = index.data(QExecutableModel::PathRole).toString();
 
-        if (confirm || QMessageBox::question(this->q_ptr, QString("Remove Test?"), "Do you want to remove test " + index.data(QExecutableModel::NameRole).toString() + "?",
-		QMessageBox::Yes | QMessageBox::No, QMessageBox::No) == QMessageBox::Yes)
-	{
-		executableTreeView->setCurrentIndex(index);
+    if (confirm || QMessageBox::question(this->q_ptr, QString("Remove Test?"),
+                                         "Do you want to remove test " + index.data(QExecutableModel::NameRole).
+                                         toString() + "?",
+                                         QMessageBox::Yes | QMessageBox::No, QMessageBox::No) == QMessageBox::Yes)
+    {
+        executableTreeView->setCurrentIndex(index);
 
-		// remove all data related to this test
-		executablePaths.removeAll(path);
-		testResultsHash.remove(path);
-		fileWatcher->removePath(path);
+        // remove all data related to this test
+        testsController_->removeTest(path);
+        executablePaths.removeAll(path);
+        fileWatcher->removePath(path);
 
-                QAbstractItemModel* oldFailureModel = failureProxyModel->sourceModel();
-                QAbstractItemModel* oldtestCaseModel = testCaseProxyModel->sourceModel();
-                failureProxyModel->setSourceModel(new GTestFailureModel(nullptr));
-                testCaseProxyModel->setSourceModel(new GTestModel(QDomDocument()));
-                delete oldFailureModel;
-                delete oldtestCaseModel;
+        const QAbstractItemModel* oldFailureModel = failureProxyModel->sourceModel();
+        failureProxyModel->setSourceModel(new GTestFailureModel(nullptr));
+        testCaseProxyModel->setSourceModel(testsController_->gTestModel(QString()).get());
+        delete oldFailureModel;
 
-		executableModel->removeRow(index.row(), index.parent());
-	}
+        executableModel->removeRow(index.row(), index.parent());
+    }
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -1231,16 +1213,16 @@ void MainWindowPrivate::removeTest(const QModelIndex &index, const bool confirm)
 //--------------------------------------------------------------------------------------------------
 void MainWindowPrivate::clearData() const
 {
-	QDir dataDir(dataPath());
-	if (dataDir.exists())
-	{
-		dataDir.removeRecursively();
-		for (int i = 0; i < executableModel->rowCount(); ++i)
-		{
-			QModelIndex index = executableModel->index(i, 0);
-			executableModel->setData(index, ExecutableData::NOT_RUNNING, QExecutableModel::StateRole);
-		}
-	}
+    QDir dataDir(dataPath());
+    if (dataDir.exists())
+    {
+        dataDir.removeRecursively();
+        for (int i = 0; i < executableModel->rowCount(); ++i)
+        {
+            QModelIndex index = executableModel->index(i, 0);
+            executableModel->setData(index, ExecutableData::NOT_RUNNING, QExecutableModel::StateRole);
+        }
+    }
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -1264,16 +1246,19 @@ void MainWindowPrivate::createToolBar()
     addRunEnvAction->setToolTip("Add new Run Environment to automatically find & execute build tests");
     runEnvComboBox_->setSizeAdjustPolicy(QComboBox::AdjustToContents);
     runEnvComboBox_->setModel(runEnvModel_);
-    runEnvComboBox_->setToolTip("Select current Run Environment. You can start a separate instance of gtest-runner for each environment");
+    runEnvComboBox_->setToolTip(
+        "Select current Run Environment. You can start a separate instance of gtest-runner for each environment");
     removeRunEnvAction_ = new QAction(q->style()->standardIcon(QStyle::SP_TrashIcon),
-                                  "Remove Run Environment", q);
-    removeRunEnvAction_->setToolTip("Removes current Run Environment (doesn't delete test data). If you want to remove test data, you have to do it manually.");
+                                      "Remove Run Environment", q);
+    removeRunEnvAction_->setToolTip(
+        "Removes current Run Environment (doesn't delete test data). If you want to remove test data, you have to do it manually.");
 
     runAllTestsAction = new QAction(q->style()->standardIcon(QStyle::SP_BrowserReload), "Run All Tests", toolBar_);
     runAllTestsAction->setShortcut(QKeySequence(Qt::Key_F6));
     killAllTestsAction_ = new QAction(q->style()->standardIcon(QStyle::SP_BrowserStop), "Kill All Tests", toolBar_);
     killAllTestsAction_->setShortcut(QKeySequence(Qt::SHIFT + Qt::Key_F6));
-    revealExplorerTestResultAction_ = new QAction(q->style()->standardIcon(QStyle::SP_DirOpenIcon), "Reveal Test Result Dir", toolBar_);
+    revealExplorerTestResultAction_ = new QAction(q->style()->standardIcon(QStyle::SP_DirOpenIcon),
+                                                  "Reveal Test Result Dir", toolBar_);
     removeAllTestsAction_ = new QAction(q->style()->standardIcon(QStyle::SP_TrashIcon), "Remove All Tests", toolBar_);
 
     toolBar_->addWidget(new QLabel("Env:", toolBar_));
@@ -1299,9 +1284,9 @@ void MainWindowPrivate::createToolBar()
         }
         else
         {
-	        const QFileInfo info(filename);
-	        const QString runEnvPath = info.absoluteFilePath();
-	        const auto alreadyIndex = runEnvComboBox_->findText(runEnvPath);
+            const QFileInfo info(filename);
+            const QString runEnvPath = info.absoluteFilePath();
+            const auto alreadyIndex = runEnvComboBox_->findText(runEnvPath);
             if (alreadyIndex != -1)
             {
                 runEnvComboBox_->setCurrentIndex(alreadyIndex);
@@ -1316,7 +1301,7 @@ void MainWindowPrivate::createToolBar()
 
             if (runEnvModel_->insertRow(runEnvModel_->rowCount()))
             {
-	            const auto index = runEnvModel_->index(runEnvModel_->rowCount() - 1, 0);
+                const auto index = runEnvModel_->index(runEnvModel_->rowCount() - 1, 0);
                 runEnvModel_->setData(index, runEnvPath);
             }
             runEnvComboBox_->setCurrentIndex(runEnvComboBox_->count() - 1);
@@ -1324,22 +1309,23 @@ void MainWindowPrivate::createToolBar()
     });
 
     connect(runEnvComboBox_, &QComboBox::currentTextChanged, [this]
-            (const QString& selectedRunEnv)
-    {
-        // only reload if changed and had one selected before
-        if (currentRunEnvPath_ != selectedRunEnv && !currentRunEnvPath_.isEmpty() && !selectedRunEnv.isEmpty())
-        {
-            saveTestSettingsForCurrentRunEnv();
-            removeAllTest(true);
-            currentRunEnvPath_ = selectedRunEnv;
-            removeRunEnvAction_->setEnabled(!currentRunEnvPath_.isEmpty());
-            loadTestSettingsForCurrentRunEnv();
-        }
-    });
+    (const QString& selectedRunEnv)
+            {
+                // only reload if changed and had one selected before
+                if (currentRunEnvPath_ != selectedRunEnv && !currentRunEnvPath_.isEmpty() && !selectedRunEnv.isEmpty())
+                {
+                    saveTestSettingsForCurrentRunEnv();
+                    removeAllTest(true);
+                    currentRunEnvPath_ = selectedRunEnv;
+                    removeRunEnvAction_->setEnabled(!currentRunEnvPath_.isEmpty());
+                    loadTestSettingsForCurrentRunEnv();
+                }
+            });
 
     connect(removeRunEnvAction_, &QAction::triggered, [this]()
     {
-        if (QMessageBox::question(this->q_ptr, "Remove Run Env", "Do you want to remove current Run Environment?", QMessageBox::Yes, QMessageBox::No) == QMessageBox::Yes)
+        if (QMessageBox::question(this->q_ptr, "Remove Run Env", "Do you want to remove current Run Environment?",
+                                  QMessageBox::Yes, QMessageBox::No) == QMessageBox::Yes)
         {
             QFile(pathToCurrenRunEnvSettings()).remove();
             removeAllTest(true);
@@ -1381,7 +1367,8 @@ void MainWindowPrivate::createToolBar()
 
 void MainWindowPrivate::killAllTest(const bool confirm)
 {
-    if (confirm || QMessageBox::question(this->q_ptr, "Kill All Test?", "Are you sure you want to kill all test?", QMessageBox::Yes, QMessageBox::No) == QMessageBox::Yes)
+    if (confirm || QMessageBox::question(this->q_ptr, "Kill All Test?", "Are you sure you want to kill all test?",
+                                         QMessageBox::Yes, QMessageBox::No) == QMessageBox::Yes)
     {
         for (int i = 0; i < executableTreeView->model()->rowCount(); ++i)
         {
@@ -1410,13 +1397,15 @@ void MainWindowPrivate::updateTestExecutables()
 
     QDir homeBase = QFileInfo(currentRunEnvPath_).dir();
 
-    QProgressDialog progress("Your RunEnv.bat/sh dir is searched for all build tests.\nPlease wait till all tests are found.", "No abort possible", 0, 100, q_ptr);
+    QProgressDialog progress("Your RunEnv.bat/sh dir is searched for all build tests.\n"
+                             "Please wait till all tests are found.",
+                             "No abort possible", 0, 100, q_ptr);
     progress.setWindowModality(Qt::WindowModal);
 
     // Remove all old and add again
     removeAllTest(true);
 
-    homeBase.setNameFilters({ TEST_DRIVER_NAME });
+    homeBase.setNameFilters({TEST_DRIVER_NAME});
     QDirIterator it(homeBase, QDirIterator::Subdirectories);
     int i = 0;
     while (it.hasNext())
@@ -1467,89 +1456,92 @@ void MainWindowPrivate::updateTestExecutables()
 //--------------------------------------------------------------------------------------------------
 void MainWindowPrivate::createExecutableContextMenu()
 {
-	Q_Q(MainWindow);
+    Q_Q(MainWindow);
 
-	executableContextMenu = new QMenu(executableTreeView);
-        executableContextMenu->setToolTipsVisible(true);
+    executableContextMenu = new QMenu(executableTreeView);
+    executableContextMenu->setToolTipsVisible(true);
 
-        runTestAction = new QAction(q->style()->standardIcon(QStyle::SP_BrowserReload), "Run Test", executableTreeView);
-        runTestAction->setShortcut(QKeySequence(Qt::Key_F5));
-        killTestAction = new QAction(q->style()->standardIcon(QStyle::SP_BrowserStop), "Kill Test", executableTreeView);
-        killTestAction->setShortcut(QKeySequence(Qt::SHIFT + Qt::Key_F5));
-        revealExplorerTestAction_ = new QAction(q->style()->standardIcon(QStyle::SP_DirOpenIcon), "Reveal Test Results", executableTreeView);
+    runTestAction = new QAction(q->style()->standardIcon(QStyle::SP_BrowserReload), "Run Test", executableTreeView);
+    runTestAction->setShortcut(QKeySequence(Qt::Key_F5));
+    killTestAction = new QAction(q->style()->standardIcon(QStyle::SP_BrowserStop), "Kill Test", executableTreeView);
+    killTestAction->setShortcut(QKeySequence(Qt::SHIFT + Qt::Key_F5));
+    revealExplorerTestAction_ = new QAction(q->style()->standardIcon(QStyle::SP_DirOpenIcon), "Reveal Test Results",
+                                            executableTreeView);
 
-        removeTestAction = new QAction(q->style()->standardIcon(QStyle::SP_TrashIcon), "Remove Test", executableTreeView);
+    removeTestAction = new QAction(q->style()->standardIcon(QStyle::SP_TrashIcon), "Remove Test", executableTreeView);
 
-        // Also add here for shortcut
-        executableTreeView->addAction(runTestAction);
-        executableTreeView->addAction(killTestAction);
+    // Also add here for shortcut
+    executableTreeView->addAction(runTestAction);
+    executableTreeView->addAction(killTestAction);
 
-	executableContextMenu->addAction(runTestAction);
-	executableContextMenu->addAction(killTestAction);
-        executableContextMenu->addAction(revealExplorerTestAction_);
-	executableContextMenu->addSeparator();
-	executableContextMenu->addAction(removeTestAction);
+    executableContextMenu->addAction(runTestAction);
+    executableContextMenu->addAction(killTestAction);
+    executableContextMenu->addAction(revealExplorerTestAction_);
+    executableContextMenu->addSeparator();
+    executableContextMenu->addAction(removeTestAction);
 
-	executableTreeView->setContextMenuPolicy(Qt::CustomContextMenu);
+    executableTreeView->setContextMenuPolicy(Qt::CustomContextMenu);
 
-        auto setEnable = [this](const QModelIndex& index)
+    auto setEnable = [this](const QModelIndex& index)
+    {
+        if (index.isValid())
         {
-            if (index.isValid())
-            {
-	            const bool isTestRunning = testRunningHash[index.data(QExecutableModel::PathRole).toString()];
-                runTestAction->setEnabled(true);
-                killTestAction->setEnabled(isTestRunning);
-                revealExplorerTestAction_->setEnabled(QDir(xmlPath(index.data(QExecutableModel::PathRole).toString())).exists());
-                removeTestAction->setEnabled(!isTestRunning);
-            }
-            else
-            {
-                runTestAction->setEnabled(false);
-                killTestAction->setEnabled(false);
-                revealExplorerTestAction_->setEnabled(false);
-                removeTestAction->setEnabled(false);
-            }
-        };
-
-        connect(executableTreeView, &QExecutableTreeView::itemSelectionChanged, [this, setEnable]()
+            const bool isTestRunning = testRunningHash[index.data(QExecutableModel::PathRole).toString()];
+            runTestAction->setEnabled(true);
+            killTestAction->setEnabled(isTestRunning);
+            revealExplorerTestAction_->setEnabled(
+                QDir(xmlPath(index.data(QExecutableModel::PathRole).toString())).exists());
+            removeTestAction->setEnabled(!isTestRunning);
+        }
+        else
         {
-	        const QModelIndex index = executableTreeView->currentIndex();
-            setEnable(index);
-        });
+            runTestAction->setEnabled(false);
+            killTestAction->setEnabled(false);
+            revealExplorerTestAction_->setEnabled(false);
+            removeTestAction->setEnabled(false);
+        }
+    };
 
-        connect(executableTreeView, &QListView::customContextMenuRequested, [this, setEnable](const QPoint& pos)
-	{
-		const QModelIndex index = executableTreeView->indexAt(pos);
-                setEnable(index);
-                executableContextMenu->exec(executableTreeView->mapToGlobal(pos));
-	});
+    connect(executableTreeView, &QExecutableTreeView::itemSelectionChanged, [this, setEnable]()
+    {
+        const QModelIndex index = executableTreeView->currentIndex();
+        setEnable(index);
+    });
 
-	connect(runTestAction, &QAction::triggered, [this]
-	{
-		const QModelIndex index = executableTreeView->currentIndex();
-		const QString path = index.data(QExecutableModel::PathRole).toString();
-		runTestInThread(path, false);
-	});
+    connect(executableTreeView, &QListView::customContextMenuRequested, [this, setEnable](const QPoint& pos)
+    {
+        const QModelIndex index = executableTreeView->indexAt(pos);
+        setEnable(index);
+        executableContextMenu->exec(executableTreeView->mapToGlobal(pos));
+    });
 
-	connect(killTestAction, &QAction::triggered, [this]
-	{
-		Q_Q(MainWindow);
-		const QString path = executableTreeView->currentIndex().data(QExecutableModel::PathRole).toString();
-		const QString name = executableTreeView->currentIndex().data(QExecutableModel::NameRole).toString();
-		if (QMessageBox::question(q, "Kill Test?", "Are you sure you want to kill test: " + name + "?", QMessageBox::Yes, QMessageBox::No) == QMessageBox::Yes)
-                        emitKillTest(path);
-	});
+    connect(runTestAction, &QAction::triggered, [this]
+    {
+        const QModelIndex index = executableTreeView->currentIndex();
+        const QString path = index.data(QExecutableModel::PathRole).toString();
+        runTestInThread(path, false);
+    });
 
-        connect(revealExplorerTestAction_, &QAction::triggered, [this]
-        {
-	        const QString path = executableTreeView->currentIndex().data(QExecutableModel::PathRole).toString();
-            QDesktopServices::openUrl(QUrl::fromLocalFile(xmlPath(path)));
-        });
+    connect(killTestAction, &QAction::triggered, [this]
+    {
+        Q_Q(MainWindow);
+        const QString path = executableTreeView->currentIndex().data(QExecutableModel::PathRole).toString();
+        const QString name = executableTreeView->currentIndex().data(QExecutableModel::NameRole).toString();
+        if (QMessageBox::question(q, "Kill Test?", "Are you sure you want to kill test: " + name + "?",
+                                  QMessageBox::Yes, QMessageBox::No) == QMessageBox::Yes)
+            emitKillTest(path);
+    });
 
-	connect(removeTestAction, &QAction::triggered, [this]
-	{
-		removeTest(executableTreeView->currentIndex());
-	});
+    connect(revealExplorerTestAction_, &QAction::triggered, [this]
+    {
+        const QString path = executableTreeView->currentIndex().data(QExecutableModel::PathRole).toString();
+        QDesktopServices::openUrl(QUrl::fromLocalFile(xmlPath(path)));
+    });
+
+    connect(removeTestAction, &QAction::triggered, [this]
+    {
+        removeTest(executableTreeView->currentIndex());
+    });
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -1557,139 +1549,140 @@ void MainWindowPrivate::createExecutableContextMenu()
 //--------------------------------------------------------------------------------------------------
 void MainWindowPrivate::createTestCaseViewContextMenu()
 {
-	testCaseTableView->setContextMenuPolicy(Qt::CustomContextMenu);
+    testCaseTableView->setContextMenuPolicy(Qt::CustomContextMenu);
 
-	testCaseViewContextMenu = new QMenu(testCaseTableView);
-        testCaseViewContextMenu->setToolTipsVisible(true);
+    testCaseViewContextMenu = new QMenu(testCaseTableView);
+    testCaseViewContextMenu->setToolTipsVisible(true);
 
-        testCaseViewRunTestCaseAction_ = new QAction("", testCaseViewContextMenu);
+    testCaseViewRunTestCaseAction_ = new QAction("", testCaseViewContextMenu);
 
-        testCaseViewContextMenu->addAction(testCaseViewRunTestCaseAction_);
-        testCaseViewContextMenu->addSeparator();
+    testCaseViewContextMenu->addAction(testCaseViewRunTestCaseAction_);
+    testCaseViewContextMenu->addSeparator();
 
-        enum SelectedLevel
+    enum SelectedLevel
+    {
+        Nothing,
+        AllTests,
+        TestSuite,
+        TestCase
+    };
+    auto getSelectedIndexLevel = [this](const QModelIndex& testCaseTableViewIndex) -> SelectedLevel
+    {
+        const auto index = testCaseProxyModel->mapToSource(testCaseTableViewIndex);
+        if (!index.isValid())
         {
-            Nothing,
-            AllTests,
-            TestSuite,
-            TestCase
-        };
-        auto getSelectedIndexLevel = [this](QModelIndex testCaseTableViewIndex) -> SelectedLevel
-        {
-            // TODO: fix
-            auto index = testCaseProxyModel->mapToSource(testCaseTableViewIndex);
-            if (!index.isValid())
-            {
-                return Nothing;
-            }
-	        const auto parentIndex = testCaseProxyModel->sourceModel()->parent(index);
-            if (!parentIndex.isValid())
-            {
-                return AllTests;
-            }
-	        const auto parentParentIndex = testCaseProxyModel->sourceModel()->parent(parentIndex);
-            if (!parentParentIndex.isValid())
-            {
-                return TestSuite;
-            }
-            return TestCase;
-        };
+            return Nothing;
+        }
+        const FlatDomeItemPtr item = static_cast<GTestModel *>(testCaseProxyModel->sourceModel())->itemForIndex(index);
 
-        connect(testCaseTableView, &QListView::customContextMenuRequested, [this, getSelectedIndexLevel](const QPoint& pos)
+        if (item && item->level() == 0)
         {
-            QModelIndex index = testCaseTableView->indexAt(pos);
+            return AllTests;
+        }
+        if (item && item->level() == 1)
+        {
+            return TestSuite;
+        }
+        return TestCase;
+    };
 
-            QString runActionText;
-            switch (getSelectedIndexLevel(index))
+    connect(testCaseTableView, &QListView::customContextMenuRequested, [this, getSelectedIndexLevel](const QPoint& pos)
+    {
+        const QModelIndex index = testCaseTableView->indexAt(pos);
+
+        QString runActionText;
+        switch (getSelectedIndexLevel(index))
+        {
+        case Nothing:
+            // Nothing -> empty
+            break;
+        case AllTests:
+        {
+            runActionText = "Run All Tests";
+            break;
+        }
+        case TestSuite:
+        {
+            runActionText = "Run Test Suite(s)";
+            break;
+        }
+        case TestCase:
+        {
+            runActionText = "Run Test Case(s)";
+            break;
+        }
+        default:
+            break;
+        }
+        testCaseViewRunTestCaseAction_->setText(runActionText);
+        testCaseViewRunTestCaseAction_->setEnabled(!runActionText.isEmpty());
+
+        testCaseViewContextMenu->exec(testCaseTableView->mapToGlobal(pos));
+    });
+
+    connect(testCaseViewRunTestCaseAction_, &QAction::triggered, [this, getSelectedIndexLevel]()
+    {
+        const auto testCaseTableViewIndexes = testCaseTableView->selectionModel()->selectedRows(
+            GTestModel::Sections::Name);
+        QString testFilter;
+        for (const auto& testCaseTableViewIndex : testCaseTableViewIndexes)
+        {
+            const auto testCaseSourceIndex = testCaseProxyModel->mapToSource(testCaseTableViewIndex);
+
+            switch (getSelectedIndexLevel(testCaseTableViewIndex))
             {
             case Nothing:
-                // Nothing -> empty
+                // Nothing -> run all
                 break;
             case AllTests:
             {
-                runActionText = "Run All Tests";
+                // all tests -> empty filter
+                testFilter.clear();
                 break;
             }
             case TestSuite:
             {
-                runActionText = "Run Test Suite(s)";
+                const auto testSuiteName = testCaseSourceIndex.data(Qt::DisplayRole).toString().trimmed();
+                if (!testFilter.isEmpty())
+                {
+                    testFilter += ":";
+                }
+                testFilter += testSuiteName + ".*";
                 break;
             }
             case TestCase:
             {
-                runActionText = "Run Test Case(s)";
+                const auto testCaseName = testCaseSourceIndex.data(Qt::DisplayRole).toString().trimmed();
+                const FlatDomeItemPtr item = static_cast<GTestModel *>(testCaseProxyModel->sourceModel())->itemForIndex(testCaseSourceIndex);
+                const auto testSuiteIndex = testCaseProxyModel->sourceModel()->index(item->parentIndex(), GTestModel::Sections::Name);
+                const auto testSuiteName = testSuiteIndex.data(Qt::DisplayRole).toString().trimmed();
+
+                if (!testFilter.isEmpty())
+                {
+                    testFilter += ":";
+                }
+                testFilter += testSuiteName + ".";
+                if (testCaseName.contains(" ("))
+                {
+                    // name contains (value_param)
+                    testFilter += testCaseName.split(" (")[0];
+                }
+                else
+                {
+                    testFilter += testCaseName;
+                }
                 break;
             }
             default:
                 break;
             }
-            testCaseViewRunTestCaseAction_->setText(runActionText);
-            testCaseViewRunTestCaseAction_->setEnabled(!runActionText.isEmpty());
+        }
 
-            testCaseViewContextMenu->exec(testCaseTableView->mapToGlobal(pos));
-        });
-
-        connect(testCaseViewRunTestCaseAction_, &QAction::triggered, [this, getSelectedIndexLevel]()
-        {
-        	const auto testCaseTableViewIndexes = testCaseTableView->selectionModel()->selectedRows();
-        	QString testFilter;
-	        for (const auto& testCaseTableViewIndex : testCaseTableViewIndexes)
-	        {
-		        const auto testCaseSourceIndex = testCaseProxyModel->mapToSource(testCaseTableViewIndex);
-
-		        switch (getSelectedIndexLevel(testCaseTableViewIndex))
-		        {
-		        case Nothing:
-			        // Nothing -> run all
-			        break;
-		        case AllTests:
-		        {
-			        // all tests -> empty filter
-		        	testFilter.clear();
-			        break;
-		        }
-		        case TestSuite:
-		        {
-			        const auto testSuiteName = testCaseSourceIndex.data(GTestModel::Sections::Name).toString();
-		        	if (!testFilter.isEmpty())
-		        	{
-						testFilter += ":";
-					}
-			        testFilter += testSuiteName + ".*";
-			        break;
-		        }
-		        case TestCase:
-		        {
-			        const auto testCaseName = testCaseSourceIndex.data(GTestModel::Sections::Name).toString();
-			        const auto testSuiteIndex = testCaseProxyModel->sourceModel()->parent(testCaseSourceIndex);
-			        const auto testSuiteName = testSuiteIndex.data(GTestModel::Sections::Name).toString();
-
-		        	if (!testFilter.isEmpty())
-		        	{
-		        		testFilter += ":";
-		        	}
-			        testFilter += testSuiteName + ".";
-			        if (testCaseName.contains(" ("))
-			        {
-				        // name contains (value_param)
-				        testFilter += testCaseName.split(" (")[0];
-			        }
-			        else
-			        {
-				        testFilter += testCaseName;
-			        }
-			        break;
-		        }
-		        default:
-			        break;
-		        }
-	        }
-
-	        const QModelIndex execIndex = executableTreeView->selectionModel()->currentIndex();
-            executableModel->setData(execIndex, testFilter, QExecutableModel::FilterRole);
-	        const QString path = execIndex.data(QExecutableModel::PathRole).toString();
-            runTestInThread(path, false);
-        });
+        const QModelIndex execIndex = executableTreeView->selectionModel()->currentIndex();
+        executableModel->setData(execIndex, testFilter, QExecutableModel::FilterRole);
+        const QString path = execIndex.data(QExecutableModel::PathRole).toString();
+        runTestInThread(path, false);
+    });
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -1697,34 +1690,35 @@ void MainWindowPrivate::createTestCaseViewContextMenu()
 //--------------------------------------------------------------------------------------------------
 void MainWindowPrivate::createConsoleContextMenu()
 {
-	Q_Q(MainWindow);
+    Q_Q(MainWindow);
 
-	consoleTextEdit->setContextMenuPolicy(Qt::CustomContextMenu);
+    consoleTextEdit->setContextMenuPolicy(Qt::CustomContextMenu);
 
-	clearConsoleAction = new QAction("Clear", this);
-	consoleFindShortcut = new QShortcut(QKeySequence("Ctrl+F"), q);
-	consoleFindAction = new QAction("Find...", this);
-	consoleFindAction->setShortcut(consoleFindShortcut->key());
+    clearConsoleAction = new QAction("Clear", this);
+    consoleFindShortcut = new QShortcut(QKeySequence("Ctrl+F"), q);
+    consoleFindAction = new QAction("Find...", this);
+    consoleFindAction->setShortcut(consoleFindShortcut->key());
 
-	connect(consoleTextEdit, &QTextEdit::customContextMenuRequested, [this](const QPoint& pos)
-	{
-		const QScopedPointer<QMenu> consoleContextMenu(consoleTextEdit->createStandardContextMenu(consoleTextEdit->mapToGlobal(pos)));
-		consoleContextMenu->addSeparator();
-		consoleContextMenu->addAction(consoleFindAction);
-		consoleContextMenu->addSeparator();
-		consoleContextMenu->addAction(clearConsoleAction);
-		consoleContextMenu->exec(consoleTextEdit->mapToGlobal(pos));
-	});
+    connect(consoleTextEdit, &QTextEdit::customContextMenuRequested, [this](const QPoint& pos)
+    {
+        const QScopedPointer<QMenu> consoleContextMenu(
+            consoleTextEdit->createStandardContextMenu(consoleTextEdit->mapToGlobal(pos)));
+        consoleContextMenu->addSeparator();
+        consoleContextMenu->addAction(consoleFindAction);
+        consoleContextMenu->addSeparator();
+        consoleContextMenu->addAction(clearConsoleAction);
+        consoleContextMenu->exec(consoleTextEdit->mapToGlobal(pos));
+    });
 
-	connect(clearConsoleAction, &QAction::triggered, consoleTextEdit, &QTextEdit::clear);
-	connect(consoleFindShortcut, &QShortcut::activated, consoleFindAction, &QAction::trigger);
-	connect(consoleFindAction, &QAction::triggered, [this]
-		{
-			consoleDock->setVisible(true);
-			consoleDock->raise();
-			consoleFindDialog->show();
-		}
-	);
+    connect(clearConsoleAction, &QAction::triggered, consoleTextEdit, &QTextEdit::clear);
+    connect(consoleFindShortcut, &QShortcut::activated, consoleFindAction, &QAction::trigger);
+    connect(consoleFindAction, &QAction::triggered, [this]
+            {
+                consoleDock->setVisible(true);
+                consoleDock->raise();
+                consoleFindDialog->show();
+            }
+    );
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -1755,37 +1749,32 @@ void MainWindowPrivate::createTestMenu()
 //--------------------------------------------------------------------------------------------------
 void MainWindowPrivate::createOptionsMenu()
 {
-	Q_Q(MainWindow);
+    Q_Q(MainWindow);
 
-	optionsMenu = new QMenu("Options", q);
-        optionsMenu->setToolTipsVisible(true);
+    optionsMenu = new QMenu("Options", q);
+    optionsMenu->setToolTipsVisible(true);
 
-        runTestsSynchronousAction_ = new QAction("Run tests synchronous and not parallel", optionsMenu);
-        pipeAllTestOutput_ = new QAction("Pipe all test output to Console Output", optionsMenu);
-        enableTestHistoryAction_ = new QAction("Keep history of test results", optionsMenu);
-	notifyOnFailureAction = new QAction("Notify on auto-run Failure", optionsMenu);
-	notifyOnSuccessAction = new QAction("Notify on auto-run Success", optionsMenu);
+    runTestsSynchronousAction_ = new QAction("Run tests synchronous and not parallel", optionsMenu);
+    pipeAllTestOutput_ = new QAction("Pipe all test output to Console Output", optionsMenu);
+    notifyOnFailureAction = new QAction("Notify on auto-run Failure", optionsMenu);
+    notifyOnSuccessAction = new QAction("Notify on auto-run Success", optionsMenu);
 
-        enableTestHistoryAction_->setToolTip("Test result history can lead to increasing memory consumption");
 
-        runTestsSynchronousAction_->setCheckable(true);
-        runTestsSynchronousAction_->setChecked(false);
-        pipeAllTestOutput_->setCheckable(true);
-        pipeAllTestOutput_->setChecked(false);
-        enableTestHistoryAction_->setCheckable(true);
-        enableTestHistoryAction_->setChecked(false);
-	notifyOnFailureAction->setCheckable(true);
-	notifyOnFailureAction->setChecked(true);
-	notifyOnSuccessAction->setCheckable(true);
-	notifyOnSuccessAction->setChecked(false);
+    runTestsSynchronousAction_->setCheckable(true);
+    runTestsSynchronousAction_->setChecked(false);
+    pipeAllTestOutput_->setCheckable(true);
+    pipeAllTestOutput_->setChecked(false);
+    notifyOnFailureAction->setCheckable(true);
+    notifyOnFailureAction->setChecked(true);
+    notifyOnSuccessAction->setCheckable(true);
+    notifyOnSuccessAction->setChecked(false);
 
-        optionsMenu->addAction(runTestsSynchronousAction_);
-        optionsMenu->addAction(pipeAllTestOutput_);
-        optionsMenu->addAction(enableTestHistoryAction_);
-	optionsMenu->addAction(notifyOnFailureAction);
-	optionsMenu->addAction(notifyOnSuccessAction);
+    optionsMenu->addAction(runTestsSynchronousAction_);
+    optionsMenu->addAction(pipeAllTestOutput_);
+    optionsMenu->addAction(notifyOnFailureAction);
+    optionsMenu->addAction(notifyOnSuccessAction);
 
-	q->menuBar()->addMenu(optionsMenu);
+    q->menuBar()->addMenu(optionsMenu);
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -1793,15 +1782,15 @@ void MainWindowPrivate::createOptionsMenu()
 //--------------------------------------------------------------------------------------------------
 void MainWindowPrivate::createWindowMenu()
 {
-	Q_Q(MainWindow);
+    Q_Q(MainWindow);
 
-	windowMenu = new QMenu("Window", q);
-        windowMenu->setToolTipsVisible(true);
-	windowMenu->addAction(executableDock->toggleViewAction());
-	windowMenu->addAction(failureDock->toggleViewAction());
-	windowMenu->addAction(consoleDock->toggleViewAction());
+    windowMenu = new QMenu("Window", q);
+    windowMenu->setToolTipsVisible(true);
+    windowMenu->addAction(executableDock->toggleViewAction());
+    windowMenu->addAction(failureDock->toggleViewAction());
+    windowMenu->addAction(consoleDock->toggleViewAction());
 
-	q->menuBar()->addMenu(windowMenu);
+    q->menuBar()->addMenu(windowMenu);
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -1809,45 +1798,45 @@ void MainWindowPrivate::createWindowMenu()
 //--------------------------------------------------------------------------------------------------
 void MainWindowPrivate::createThemeMenu()
 {
-	Q_Q(MainWindow);
+    Q_Q(MainWindow);
 
-	themeMenu = new QMenu("Theme");
-        themeMenu->setToolTipsVisible(true);
+    themeMenu = new QMenu("Theme");
+    themeMenu->setToolTipsVisible(true);
 
-	defaultThemeAction = new QAction("Default Theme", themeMenu);
-	defaultThemeAction->setObjectName("defaultThemeAction");
-	defaultThemeAction->setCheckable(true);
-	connect(defaultThemeAction, &QAction::triggered, [&]()
-	{
-		qApp->setStyleSheet("");
-	});
+    defaultThemeAction = new QAction("Default Theme", themeMenu);
+    defaultThemeAction->setObjectName("defaultThemeAction");
+    defaultThemeAction->setCheckable(true);
+    connect(defaultThemeAction, &QAction::triggered, [&]()
+    {
+        qApp->setStyleSheet(QString());
+    });
 
-	darkThemeAction = new QAction("Dark Theme", themeMenu);
-	darkThemeAction->setObjectName("darkThemeAction");
-	darkThemeAction->setCheckable(true);
-	connect(darkThemeAction, &QAction::triggered, [&]()
-	{
-		QFile f(":styles/qdarkstyle");
-		if (!f.exists())
-		{
-			printf("Unable to set stylesheet, file not found\n");
-		}
-		else
-		{
-			f.open(QFile::ReadOnly | QFile::Text);
-			QTextStream ts(&f);
-			qApp->setStyleSheet(ts.readAll());
-		}
-	});
+    darkThemeAction = new QAction("Dark Theme", themeMenu);
+    darkThemeAction->setObjectName("darkThemeAction");
+    darkThemeAction->setCheckable(true);
+    connect(darkThemeAction, &QAction::triggered, [&]()
+    {
+        QFile f(":styles/qdarkstyle");
+        if (!f.exists())
+        {
+            printf("Unable to set stylesheet, file not found\n");
+        }
+        else
+        {
+            f.open(QFile::ReadOnly | QFile::Text);
+            QTextStream ts(&f);
+            qApp->setStyleSheet(ts.readAll());
+        }
+    });
 
-	themeMenu->addAction(defaultThemeAction);
-	themeMenu->addAction(darkThemeAction);
+    themeMenu->addAction(defaultThemeAction);
+    themeMenu->addAction(darkThemeAction);
 
-	themeActionGroup = new QActionGroup(themeMenu);
-	themeActionGroup->addAction(defaultThemeAction);
-	themeActionGroup->addAction(darkThemeAction);
+    themeActionGroup = new QActionGroup(themeMenu);
+    themeActionGroup->addAction(defaultThemeAction);
+    themeActionGroup->addAction(darkThemeAction);
 
-	q->menuBar()->addMenu(themeMenu);
+    q->menuBar()->addMenu(themeMenu);
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -1855,24 +1844,26 @@ void MainWindowPrivate::createThemeMenu()
 //--------------------------------------------------------------------------------------------------
 void MainWindowPrivate::createHelpMenu()
 {
-	Q_Q(MainWindow);
+    Q_Q(MainWindow);
 
-	helpMenu = new QMenu("Help");
-        helpMenu->setToolTipsVisible(true);
+    helpMenu = new QMenu("Help");
+    helpMenu->setToolTipsVisible(true);
 
-	aboutAction = new QAction("About...", helpMenu);
+    aboutAction = new QAction("About...", helpMenu);
 
-	helpMenu->addAction(aboutAction);
+    helpMenu->addAction(aboutAction);
 
-	connect(aboutAction, &QAction::triggered, []
-	{
-		QMessageBox msgBox;
-		msgBox.setWindowTitle("About");
-		msgBox.setIconPixmap(QPixmap(":images/logo").scaled(128, 128, Qt::KeepAspectRatio, Qt::SmoothTransformation));
-		msgBox.setTextFormat(Qt::RichText);   //this is what makes the links clickable
-		msgBox.setText("Application: " + APPINFO::name + "<br>version: " + APPINFO::version +
-			"<br>Developer: Oliver Karrenbauer" + "<br>Organization: " + APPINFO::organization + "<br>Website: <a href='" + APPINFO::oranizationDomain + "'>" + APPINFO::oranizationDomain + "</a>" + "<br><br>" +
-			"The MIT License (MIT)<br><br>\
+    connect(aboutAction, &QAction::triggered, []
+    {
+        QMessageBox msgBox;
+        msgBox.setWindowTitle("About");
+        msgBox.setIconPixmap(QPixmap(":images/logo").scaled(128, 128, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+        msgBox.setTextFormat(Qt::RichText); //this is what makes the links clickable
+        msgBox.setText("Application: " + APPINFO::name + "<br>version: " + APPINFO::version +
+                       "<br>Developer: Oliver Karrenbauer" + "<br>Organization: " + APPINFO::organization +
+                       "<br>Website: <a href='" + APPINFO::oranizationDomain + "'>" + APPINFO::oranizationDomain +
+                       "</a>" + "<br><br>" +
+                       "The MIT License (MIT)<br><br>\
 			\
 			Copyright(c) 2016 Nic Holthaus<br><br>\
 			\
@@ -1893,12 +1884,12 @@ void MainWindowPrivate::createHelpMenu()
 			LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,	\
 			OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE	\
 			SOFTWARE."
-			);
-		msgBox.setStandardButtons(QMessageBox::Ok);
-		msgBox.exec();
-	});
+        );
+        msgBox.setStandardButtons(QMessageBox::Ok);
+        msgBox.exec();
+    });
 
-	q->menuBar()->addMenu(helpMenu);
+    q->menuBar()->addMenu(helpMenu);
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -1906,27 +1897,16 @@ void MainWindowPrivate::createHelpMenu()
 //--------------------------------------------------------------------------------------------------
 void MainWindowPrivate::scrollToConsoleCursor() const
 {
-	const int cursorY = consoleTextEdit->cursorRect().top();
-    QScrollBar *vbar = consoleTextEdit->verticalScrollBar();
+    const int cursorY = consoleTextEdit->cursorRect().top();
+    QScrollBar* vbar = consoleTextEdit->verticalScrollBar();
     vbar->setValue(vbar->value() + cursorY - 0);
 }
 
 void MainWindowPrivate::emitKillTest(const QString& path)
 {
-	const auto findTest = testKillHandler_.find(path);
+    const auto findTest = testKillHandler_.find(path);
     if (findTest != testKillHandler_.end() && findTest->second.load())
     {
         findTest->second.load()->emitKillTest();
     }
-}
-
-
-QString MainWindowPrivate::settingsPath()
-{
-    return QStandardPaths::standardLocations(QStandardPaths::AppConfigLocation).first() + "/" + "settings";
-}
-
-QString MainWindowPrivate::dataPath()
-{
-    return QStandardPaths::standardLocations(QStandardPaths::AppConfigLocation).first() + "/" + "data";
 }

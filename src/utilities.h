@@ -36,56 +36,18 @@
 
 #pragma once
 
-#include <QDomNode>
-#include <vector>
-#include <functional>
-#include <memory>
+#include <QThreadPool>
 
 
-class FlatDomeItem
-{
-public:
-    explicit FlatDomeItem(const QDomNode& node, int level, int row, int parentIndex);
-
-    const QDomNode& node() const;
-
-    int level() const;
-
-    int row() const;
-
-    int parentIndex() const;
-
-private:
-    QDomNode node_;
-    int level_;
-    int row_;
-    int parentIndex_;
-};
-
-using FlatDomeItemPtr = std::shared_ptr<FlatDomeItem>;
+const QString TEST_DRIVER_NAME = "TestDriver.py";
+const QString GTEST_RESULT_NAME = "gtest-runner_result.xml";
+const QString LATEST_RESULT_DIR_NAME = "latest";
+const QString DATE_FORMAT = "yyyy.MM.dd_hh.mm.ss.zzz";
+const int MAX_PARALLEL_TEST_EXEC = QThreadPool::globalInstance()->maxThreadCount();
 
 
-class FlatDomeItemHandler
-{
-public:
-    using FilterFunc = std::function<bool(const QDomNode&)>;
+QString settingsPath();
 
-    explicit FlatDomeItemHandler(const QDomNode& rootNode, const QDomNode& rootReferenceNode, FilterFunc filterFunc);
+QString dataPath();
 
-    FlatDomeItemPtr item(std::size_t row) const;
-
-    int numberItems() const;
-
-private:
-    void addChildren(const QDomNode& node, const QDomNode& referenceNode, int level, int& row, int parentIndex);
-
-    void addItem(const QDomNode& node, int level, int& row, int parentIndex);
-
-    void addEmptyItem(int level, int& row);
-
-    bool shouldAddItem(const QDomNode& node) const;
-
-
-    std::vector<FlatDomeItemPtr> items_;
-    FilterFunc filterFunc_;
-};
+QString xmlPath(const QString& testPath, bool create = false);

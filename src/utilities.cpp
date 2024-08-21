@@ -34,58 +34,38 @@
 //
 //--------------------------------------------------------------------------------------------------
 
-#pragma once
+#include "utilities.h"
+#include <QDir>
+#include <QStandardPaths>
+#include <QFileInfo>
+#include <QCryptographicHash>
 
-#include <QDomNode>
-#include <vector>
-#include <functional>
-#include <memory>
 
-
-class FlatDomeItem
+QString settingsPath()
 {
-public:
-    explicit FlatDomeItem(const QDomNode& node, int level, int row, int parentIndex);
+    return QStandardPaths::standardLocations(QStandardPaths::AppConfigLocation).first() + "/" + "settings";
+}
 
-    const QDomNode& node() const;
-
-    int level() const;
-
-    int row() const;
-
-    int parentIndex() const;
-
-private:
-    QDomNode node_;
-    int level_;
-    int row_;
-    int parentIndex_;
-};
-
-using FlatDomeItemPtr = std::shared_ptr<FlatDomeItem>;
-
-
-class FlatDomeItemHandler
+QString dataPath()
 {
-public:
-    using FilterFunc = std::function<bool(const QDomNode&)>;
+    return QStandardPaths::standardLocations(QStandardPaths::AppConfigLocation).first() + "/" + "data";
+}
 
-    explicit FlatDomeItemHandler(const QDomNode& rootNode, const QDomNode& rootReferenceNode, FilterFunc filterFunc);
+QString xmlPath(const QString& testPath, const bool create)
+{
+    static std::map<QString, QString> testPathToXmlPathMap;
+    auto iter = testPathToXmlPathMap.find(testPath);
+    if (iter == testPathToXmlPathMap.end())
+    {
+        const QString name = QFileInfo(testPath).baseName();
+        const QString hash = QCryptographicHash::hash(testPath.toLatin1(), QCryptographicHash::Md5).toHex();
+        QString path = dataPath() + "/" + name + "_" + hash;
+        iter = testPathToXmlPathMap.insert({testPath, path}).first;
+    }
 
-    FlatDomeItemPtr item(std::size_t row) const;
-
-    int numberItems() const;
-
-private:
-    void addChildren(const QDomNode& node, const QDomNode& referenceNode, int level, int& row, int parentIndex);
-
-    void addItem(const QDomNode& node, int level, int& row, int parentIndex);
-
-    void addEmptyItem(int level, int& row);
-
-    bool shouldAddItem(const QDomNode& node) const;
-
-
-    std::vector<FlatDomeItemPtr> items_;
-    FilterFunc filterFunc_;
-};
+    if (create)
+    {
+        (void) QDir(iter->second).mkpath(".");
+    }
+    return iter->second;
+}

@@ -120,6 +120,8 @@ src/domitem.h
 src/flatDomeItem.h
 src/GTestFailureModel.h
 src/gtestModel.h
+src/testsController.h
+src/utilities.h
 src/qexecutablemodel.h
 src/qexecutabletreeview.h
 src/QBottomUpSortFilterProxy.h
@@ -147,6 +149,8 @@ src/domitem.cpp
 src/flatDomeItem.cpp
 src/GTestFailureModel.cpp
 src/gtestModel.cpp
+src/testsController.cpp
+src/utilities.cpp
 src/qexecutablemodel.cpp
 src/qexecutabletreeview.cpp
 src/QBottomUpSortFilterProxy.cpp

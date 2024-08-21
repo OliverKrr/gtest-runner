@@ -35,21 +35,20 @@
 // 
 //--------------------------------------------------------------------------------------------------
 
-#ifndef gtestModel_h__
-#define gtestModel_h__
+#pragma once
 
 //------------------------------
 //	INCLUDE
 //------------------------------
 
-#include <QAbstractTableModel>
-#include <QDomDocument>
 #include <QIcon>
 #include <QModelIndex>
+#include <deque>
+#include <utility>
 
 #include "flatDomeItem.h"
 
-class GTestModel : public QAbstractTableModel
+class GTestModel final : public QAbstractTableModel
 {
     Q_OBJECT
 
@@ -67,18 +66,21 @@ public:
         ResultAndTime
     };
 
+    explicit GTestModel(QObject* parent = 0);
 
-    explicit GTestModel(QDomDocument overviewDocuement, QObject* parent = 0);
-
-    void addTestResult(int index, QDomDocument document);
-    void removeTestResult(const int index);
+    void updateModel();
+    void updateOverviewDocument(QDomDocument overviewDocument);
+    std::size_t addTestResultBack(const QDomDocument& document);
+    std::size_t addTestResultFront(const QDomDocument& document);
+    void addTestResult(std::size_t index, QDomDocument document);
+    void removeTestResult(std::size_t index);
     FlatDomeItemPtr itemForIndex(const QModelIndex& index) const;
 
-    QVariant data(const QModelIndex &index, int role) const Q_DECL_OVERRIDE;
+    QVariant data(const QModelIndex &index, int role) const override;
     QVariant headerData(int section, Qt::Orientation orientation,
-                        int role = Qt::DisplayRole) const Q_DECL_OVERRIDE;
-    int rowCount(const QModelIndex& parent = QModelIndex()) const Q_DECL_OVERRIDE;
-    int columnCount(const QModelIndex& parent = QModelIndex()) const Q_DECL_OVERRIDE;
+                        int role = Qt::DisplayRole) const override;
+    int rowCount(const QModelIndex& parent = QModelIndex()) const override;
+    int columnCount(const QModelIndex& parent = QModelIndex()) const override;
 
 private:
     struct Model
@@ -86,8 +88,8 @@ private:
         QDomDocument document_;
         FlatDomeItemHandler domeItemHandler_;
 
-        explicit Model(const QDomDocument document, const FlatDomeItemHandler domeItemHandler)
-            : document_(document), domeItemHandler_(domeItemHandler)
+        explicit Model(const QDomDocument& document, FlatDomeItemHandler  domeItemHandler)
+            : document_(document), domeItemHandler_(std::move(domeItemHandler))
         {
         }
     };
@@ -96,21 +98,22 @@ private:
     ModelPtr modelForColumn(int column) const;
     Sections sectionForColumn(int column) const;
     QString timestampForColumn(int column) const;
-    QString indent(int level) const;
-    QString reverseIndent(int level) const;
+    static QString indent(int level);
 
-    ModelPtr initModel(QDomDocument& document, const QDomDocument& overviewDocuement) const;
-    void removeComments(QDomNode& node) const;
-    bool isFailure(const QDomNode& node) const;
+    static QString reverseIndent(int level);
+
+    ModelPtr initModel(QDomDocument& document, const QDomDocument& overviewDocument) const;
+
+    static void removeComments(const QDomNode& node);
+
+    static bool isFailure(const QDomNode& node);
 
 
     ModelPtr overviewModel_;
-    std::vector<ModelPtr> testResults_;
+    std::deque<ModelPtr> testResults_;
 
     QIcon grayIcon;
     QIcon greenIcon;
     QIcon yellowIcon;
     QIcon redIcon;
 };
-
-#endif // gtestModel_h__

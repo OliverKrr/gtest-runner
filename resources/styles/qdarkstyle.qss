@@ -542,7 +542,6 @@ QHeaderView::section
 {
     background-color: #76797C;
     color: #eff0f1;
-    padding: 5px;
     border: 1px solid #76797C;
 }
 
@@ -1118,11 +1117,13 @@ QTableView, QHeaderView
 QTableView::item:pressed, QListView::item:pressed, QTreeView::item:pressed  {
     background: #3daee9;
     color: #eff0f1;
+    border: 2px solid black;
 }
 
 QTableView::item:selected:active, QTreeView::item:selected:active, QListView::item:selected:active  {
     background: #3daee9;
     color: #eff0f1;
+    border: 2px solid black;
 }
 
 
@@ -1139,7 +1140,6 @@ QHeaderView
 QHeaderView::section  {
     background-color: #31363b;
     color: #eff0f1;
-    padding: 5px;
     border: 1px solid #76797C;
     border-radius: 0px;
     text-align: center;

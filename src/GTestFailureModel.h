@@ -46,33 +46,36 @@ class DomItem;
 
 class GTestFailureModel final : public QAbstractItemModel
 {
-	Q_OBJECT
+    Q_OBJECT
 
 public:
+    enum Roles
+    {
+        PathRole = Qt::UserRole,
+        LineRole = Qt::UserRole + 1,
+        MessageRole = Qt::UserRole + 2,
+    };
 
-	enum Roles
-	{
-		PathRole = Qt::UserRole,
-		LineRole = Qt::UserRole + 1,
-		MessageRole = Qt::UserRole + 2,
-	};
+    explicit GTestFailureModel(FlatDomeItemPtr root, QObject* parent = nullptr);
 
-    explicit GTestFailureModel(FlatDomeItemPtr root, QObject *parent = nullptr);
-	~GTestFailureModel() override;
+    ~GTestFailureModel() override;
 
-	QVariant data(const QModelIndex &index, int role) const Q_DECL_OVERRIDE;
-	Qt::ItemFlags flags(const QModelIndex &index) const Q_DECL_OVERRIDE;
-	QVariant headerData(int section, Qt::Orientation orientation,
-		int role = Qt::DisplayRole) const Q_DECL_OVERRIDE;
-	QModelIndex index(int row, int column,
-		const QModelIndex &parent = QModelIndex()) const Q_DECL_OVERRIDE;
-	QModelIndex parent(const QModelIndex &child) const Q_DECL_OVERRIDE;
-	int rowCount(const QModelIndex &parent = QModelIndex()) const Q_DECL_OVERRIDE;
-	int columnCount(const QModelIndex &parent = QModelIndex()) const Q_DECL_OVERRIDE;
+    QVariant data(const QModelIndex& index, int role) const override;
+
+    Qt::ItemFlags flags(const QModelIndex& index) const override;
+
+    QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const override;
+
+    QModelIndex index(int row, int column, const QModelIndex& parent = QModelIndex()) const override;
+
+    QModelIndex parent(const QModelIndex& child) const override;
+
+    int rowCount(const QModelIndex& parent = QModelIndex()) const override;
+
+    int columnCount(const QModelIndex& parent = QModelIndex()) const override;
 
 private:
+    DomItem* rootItem;
 
-	DomItem *rootItem;
-
-	QIcon failIcon;
+    QIcon failIcon;
 };
