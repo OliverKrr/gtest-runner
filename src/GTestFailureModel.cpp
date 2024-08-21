@@ -229,7 +229,7 @@ int GTestFailureModel::rowCount(const QModelIndex &parent) const
 		const QDomNodeList failures = parentItem->node().childNodes();
 		for (auto i = 0; i < failures.count(); ++i)
 		{
-			if (failures.at(i).nodeName() == "failure") ++count;
+			if (failures.at(i).nodeName() == "failure" || failures.at(i).nodeName() == "skipped") ++count;
 		}
 		return count;
 	}

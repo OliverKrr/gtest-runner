@@ -73,6 +73,8 @@ QVariant GTestModel::data(const QModelIndex &index, const int role) const
 		{
 			if (attributeMap.namedItem("status").nodeValue().contains("notrun"))
 				return grayIcon;
+			if (attributeMap.namedItem("result").nodeValue().contains("skipped"))
+				return grayIcon;
 			if (!attributeMap.namedItem("failures").isNull())
 			{
 				if (attributeMap.namedItem("failures").nodeValue().toInt() > 0)
@@ -208,8 +210,9 @@ int GTestModel::rowCount(const QModelIndex &parent) const
 	else
 		parentItem = static_cast<DomItem*>(parent.internalPointer());
 
-	// don't show failure nodes in the test model. They'll go in a separate model.
-	if (parentItem->node().toElement().firstChild().nodeName() == "failure")
+	const auto& firstChildNodeName = parentItem->node().toElement().firstChild().nodeName();
+	// don't show failure/skipped nodes in the test model. They'll go in a separate model.
+	if (firstChildNodeName == "failure" || firstChildNodeName == "skipped")
 		return 0;
 
 	return parentItem->node().childNodes().count();
