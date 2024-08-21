@@ -93,16 +93,10 @@ QExecutableSettingsDialog::QExecutableSettingsDialog(QWidget* parent /*= (QObjec
 	layout->addWidget(d->gtestOtherArgsLineEdit, 6, 1);
 	layout->addWidget(d->buttonBox, 7, 0, 2, 2);
 
-        // This feature is introduced in 1ced315a483f4ecac21893ce6ceeb502afb82eff
-        // > v1.10.0 of googletest
-        d->gtestFailFastCheckbox->setEnabled(false);
-        // TODO if new googletest version is used -> enable feature again
-        d->gtestFailFastCheckbox->setToolTip("Only supported in googletest > v1.10.0 -> requires >= C++14");
-
 	d->gtestFilterEdit->setPlaceholderText("Use * for wildcard");
 	d->gtestFilterLabel->setToolTip("Sets the gtest_filter command line argument.");
 	d->gtestAlsoRunDisabledTestsCheckbox->setToolTip("sets the gtest_also_run_disabled_tests command line argument.");
-        //d->gtestFailFastCheckbox->setToolTip("Sets the gtest_fail_fast command line argument. Test execution will stop of first error.");
+	d->gtestFailFastCheckbox->setToolTip("Sets the gtest_fail_fast command line argument. Test execution will stop of first error.");
 	d->gtestRepeatLineEdit->setToolTip("set the gtest_repeat command line argument. A value of -1 will cause the test to run forever.");
 	d->gtestRepeatLineEdit->setText("1");
 	d->gtestRepeatLineEdit->setValidator(d->gtestRepeatValidator);
