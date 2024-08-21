@@ -20,6 +20,7 @@
 #include <QStatusBar>
 #include <QMessageBox>
 #include <QListWidget>
+#include <thread>
 
 #ifndef Q_OS_WIN32
 #define PYTHON "python3"
@@ -140,6 +141,8 @@ MainWindowPrivate::MainWindowPrivate(const QStringList&, const bool reset, MainW
 	testCaseTreeView->setSortingEnabled(true);
 	testCaseTreeView->sortByColumn(GTestModel::TestNumber, Qt::AscendingOrder);
 	testCaseTreeView->setModel(testCaseProxyModel);
+	testCaseTreeView->setSelectionMode(QAbstractItemView::ExtendedSelection);
+	testCaseTreeView->setSelectionBehavior(QAbstractItemView::SelectRows);
 
 	testCaseProxyModel->setFilterCaseSensitivity(Qt::CaseInsensitive);
 
@@ -1603,12 +1606,12 @@ void MainWindowPrivate::createTestCaseViewContextMenu()
             }
             case TestSuite:
             {
-                runActionText = "Run Test Suite";
+                runActionText = "Run Test Suite(s)";
                 break;
             }
             case TestCase:
             {
-                runActionText = "Run Test Case";
+                runActionText = "Run Test Case(s)";
                 break;
             }
             default:
@@ -1622,47 +1625,59 @@ void MainWindowPrivate::createTestCaseViewContextMenu()
 
         connect(testCaseViewRunTestCaseAction_, &QAction::triggered, [this, getSelectedIndexLevel]()
         {
-	        const auto testCaseTreeViewIndex = testCaseTreeView->selectionModel()->currentIndex();
-	        const auto testCaseSourceIndex = testCaseProxyModel->mapToSource(testCaseTreeViewIndex);
+	        const auto testCaseTreeViewIndexes = testCaseTreeView->selectionModel()->selectedRows();
+        	QString testFilter;
+	        for (const auto& testCaseTreeViewIndex : testCaseTreeViewIndexes)
+	        {
+		        const auto testCaseSourceIndex = testCaseProxyModel->mapToSource(testCaseTreeViewIndex);
 
-            QString testFilter;
-            switch (getSelectedIndexLevel(testCaseTreeViewIndex))
-            {
-            case Nothing:
-                // Nothing -> run all
-                break;
-            case AllTests:
-            {
-                // all tests -> empty filter
-                break;
-            }
-            case TestSuite:
-            {
-	            const auto testSuiteName = testCaseSourceIndex.data(GTestModel::Sections::Name).toString();
-                testFilter = testSuiteName + ".*";
-                break;
-            }
-            case TestCase:
-            {
-	            const auto testCaseName = testCaseSourceIndex.data(GTestModel::Sections::Name).toString();
-	            const auto testSuiteIndex = testCaseProxyModel->sourceModel()->parent(testCaseSourceIndex);
-	            const auto testSuiteName = testSuiteIndex.data(GTestModel::Sections::Name).toString();
+		        switch (getSelectedIndexLevel(testCaseTreeViewIndex))
+		        {
+		        case Nothing:
+			        // Nothing -> run all
+			        break;
+		        case AllTests:
+		        {
+			        // all tests -> empty filter
+		        	testFilter.clear();
+			        break;
+		        }
+		        case TestSuite:
+		        {
+			        const auto testSuiteName = testCaseSourceIndex.data(GTestModel::Sections::Name).toString();
+		        	if (!testFilter.isEmpty())
+		        	{
+						testFilter += ":";
+					}
+			        testFilter += testSuiteName + ".*";
+			        break;
+		        }
+		        case TestCase:
+		        {
+			        const auto testCaseName = testCaseSourceIndex.data(GTestModel::Sections::Name).toString();
+			        const auto testSuiteIndex = testCaseProxyModel->sourceModel()->parent(testCaseSourceIndex);
+			        const auto testSuiteName = testSuiteIndex.data(GTestModel::Sections::Name).toString();
 
-                testFilter = testSuiteName + ".";
-                if (testCaseName.contains(" ("))
-                {
-                    // name contains (value_param)
-                    testFilter += testCaseName.split(" (")[0];
-                }
-                else
-                {
-                    testFilter += testCaseName;
-                }
-                break;
-            }
-            default:
-                break;
-            }
+		        	if (!testFilter.isEmpty())
+		        	{
+		        		testFilter += ":";
+		        	}
+			        testFilter += testSuiteName + ".";
+			        if (testCaseName.contains(" ("))
+			        {
+				        // name contains (value_param)
+				        testFilter += testCaseName.split(" (")[0];
+			        }
+			        else
+			        {
+				        testFilter += testCaseName;
+			        }
+			        break;
+		        }
+		        default:
+			        break;
+		        }
+	        }
 
 	        const QModelIndex execIndex = executableTreeView->selectionModel()->currentIndex();
             executableModel->setData(execIndex, testFilter, QExecutableModel::FilterRole);
