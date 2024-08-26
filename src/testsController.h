@@ -92,9 +92,6 @@ private:
     {
         QString testResultFile_;
         QDomDocument dom_;
-        std::size_t indexInGtestModel_;
-
-        TestResultData();
     };
 
     struct TestData
@@ -124,4 +121,6 @@ private:
     static bool addTestResultData(const QString& path, const QString& testResultFile, const TestDataPtr& testData);
 
     static bool loadTestResultXml(const QString& pathToTestXml, QDomDocument& doc);
+
+    static void removeOldTests(const TestDataPtr& testData);
 };

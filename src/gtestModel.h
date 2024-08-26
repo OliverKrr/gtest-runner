@@ -70,10 +70,8 @@ public:
 
     void updateModel();
     void updateOverviewDocument(QDomDocument overviewDocument);
-    std::size_t addTestResultBack(const QDomDocument& document);
-    std::size_t addTestResultFront(const QDomDocument& document);
-    void addTestResult(std::size_t index, QDomDocument document);
-    void removeTestResult(std::size_t index);
+    void addTestResultFront(QDomDocument document);
+    void removeTestResultBack();
     FlatDomeItemPtr itemForIndex(const QModelIndex& index) const;
 
     QVariant data(const QModelIndex &index, int role) const override;

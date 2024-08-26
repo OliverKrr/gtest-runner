@@ -44,6 +44,7 @@ const QString GTEST_RESULT_NAME = "gtest-runner_result.xml";
 const QString LATEST_RESULT_DIR_NAME = "latest";
 const QString DATE_FORMAT = "yyyy.MM.dd_hh.mm.ss.zzz";
 const int MAX_PARALLEL_TEST_EXEC = QThreadPool::globalInstance()->maxThreadCount();
+constexpr std::size_t MAX_HISTORY_TEST_RESULTS = 10;
 
 
 QString settingsPath();

@@ -26,44 +26,20 @@ void GTestModel::updateOverviewDocument(QDomDocument overviewDocument)
     }
 }
 
-std::size_t GTestModel::addTestResultBack(const QDomDocument& document)
+void GTestModel::addTestResultFront(QDomDocument document)
 {
-    const std::size_t newIndex = testResults_.size();
-    addTestResult(newIndex, document);
-    return newIndex;
-}
-
-std::size_t GTestModel::addTestResultFront(const QDomDocument& document)
-{
-    constexpr std::size_t newIndex = 0;
-    addTestResult(newIndex, document);
-    return newIndex;
-}
-
-void GTestModel::addTestResult(const std::size_t index, QDomDocument document)
-{
-    if (index > testResults_.size())
-    {
-        return;
-    }
-
-    auto pos = testResults_.begin();
-    std::advance(pos, index);
     const ModelPtr model = initModel(document, overviewModel_ ? overviewModel_->document_ : QDomDocument());
-    testResults_.insert(pos, model);
+    testResults_.emplace_front(model);
 }
 
-void GTestModel::removeTestResult(const std::size_t index)
+void GTestModel::removeTestResultBack()
 {
-    if (index >= testResults_.size())
+    if (testResults_.empty())
     {
         return;
     }
-    auto pos = testResults_.begin();
-    std::advance(pos, index);
-    testResults_.erase(pos);
+    testResults_.pop_back();
 }
-
 
 int GTestModel::columnCount(const QModelIndex& /*parent*/) const
 {

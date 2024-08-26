@@ -73,9 +73,9 @@ void TestsController::addTest(const QString& path)
     }
 
     // Add TestResults to GtestModel
-    for (auto& testResult : testData->testResults_)
+    for (const auto& testResult : testData->testResults_)
     {
-        testResult.indexInGtestModel_ = testData->gtestModel_->addTestResultFront(testResult.dom_);
+        testData->gtestModel_->addTestResultFront(testResult.dom_);
     }
 
     testsData_.emplace(path, std::move(testData));
@@ -116,10 +116,10 @@ bool TestsController::loadLatestTestResult(const QString& path, int& numberError
             return false;
         }
 
-        auto& latestTestResult = testData->testResults_.back();
+        const auto& latestTestResult = testData->testResults_.back();
         // TODO: OVERVIEW: if we don't have overview xml -> need to update model here
         testData->gtestModel_->updateOverviewDocument(latestTestResult.dom_);
-        latestTestResult.indexInGtestModel_ = testData->gtestModel_->addTestResultFront(latestTestResult.dom_);
+        testData->gtestModel_->addTestResultFront(latestTestResult.dom_);
 
         testData->gtestModel_->updateModel();
     }
@@ -175,12 +175,11 @@ bool TestsController::addTestResultData(const QString& path, const QString& test
     if (loadTestResultXml(pathToTestXml, doc))
     {
         TestResultData resultData;
+        resultData.testResultFile_ = pathToTestXml;
         resultData.dom_ = doc;
         testData->testResults_.emplace_back(resultData);
+        removeOldTests(testData);
         return true;
-
-        // TODO: need to define a limit and delete old results
-        // TODO: add option to make a result "sticky"
     }
     return false;
 }
@@ -209,6 +208,23 @@ bool TestsController::loadTestResultXml(const QString& pathToTestXml, QDomDocume
     return true;
 }
 
+void TestsController::removeOldTests(const TestDataPtr& testData)
+{
+    // Remove the oldest results
+    // TODO: add option to make a result "sticky"
+    while (testData->testResults_.size() > MAX_HISTORY_TEST_RESULTS)
+    {
+        const auto toRemove = testData->testResults_.begin();
+        QFile xmlFile(toRemove->testResultFile_);
+        if (xmlFile.exists())
+        {
+            xmlFile.remove();
+        }
+        testData->gtestModel_->removeTestResultBack();
+        testData->testResults_.erase(toRemove);
+    }
+}
+
 void TestsController::setAutoRun(const QString& path, bool autoRun)
 {
     const auto iter = testsData_.find(path);
@@ -226,12 +242,6 @@ bool TestsController::autoRun(const QString& path) const
         return iter->second->autoRun_;
     }
     return false;
-}
-
-
-TestsController::TestResultData::TestResultData()
-    : indexInGtestModel_(-1)
-{
 }
 
 TestsController::TestData::TestData()
