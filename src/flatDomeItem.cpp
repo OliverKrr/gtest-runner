@@ -127,6 +127,10 @@ void FlatDomeItemHandler::addItem(const QDomNode& node, const int level, int& ro
     int itemRow = level == 2 ? ++row : 0;
     auto item = std::make_shared<FlatDomeItem>(node, level, itemRow, parentIndex);
     items_.emplace_back(item);
+    if (parentIndex >= 0)
+    {
+        items_[static_cast<size_t>(parentIndex)]->addChildIndex(items_.size() - 1);
+    }
 }
 
 void FlatDomeItemHandler::addEmptyItem(const int level, int& row)

@@ -5,6 +5,7 @@
 #include "testsController.h"
 #include "utilities.h"
 #include "gtestModel.h"
+#include "GTestModelSortFilterProxy.h"
 
 #include <QApplication>
 #include <QClipboard>
@@ -68,8 +69,10 @@ MainWindowPrivate::MainWindowPrivate(const QStringList&, const bool reset, MainW
     fileWatcher(new QFileSystemWatcher(q)),
     centralFrame(new QFrame(q)),
     testCaseFilterEdit(new QLineEdit(q)),
+    testCaseFilterPassed(new QCheckBox(q)),
+    testCaseFilterIgnored(new QCheckBox(q)),
     testCaseTableView(new QTableView(q)),
-    testCaseProxyModel(new QSortFilterProxyModel(q)),
+    testCaseProxyModel(new GTestModelSortFilterProxy(q)),
     failureDock(new QDockWidget(q)),
     failureTreeView(new QTreeView(q)),
     failureProxyModel(new QFilterEmptyColumnProxy(q)),
@@ -100,7 +103,12 @@ MainWindowPrivate::MainWindowPrivate(const QStringList&, const bool reset, MainW
     const QFont consolas("consolas", 10);
 
     centralFrame->setLayout(new QVBoxLayout);
-    centralFrame->layout()->addWidget(testCaseFilterEdit);
+    auto* filterWidget = new QWidget(centralFrame);
+    filterWidget->setLayout(new QHBoxLayout);
+    filterWidget->layout()->addWidget(testCaseFilterEdit);
+    filterWidget->layout()->addWidget(testCaseFilterPassed);
+    filterWidget->layout()->addWidget(testCaseFilterIgnored);
+    centralFrame->layout()->addWidget(filterWidget);
     centralFrame->layout()->addWidget(testCaseTableView);
     centralFrame->layout()->setContentsMargins(0, 5, 0, 0);
 
@@ -135,6 +143,11 @@ MainWindowPrivate::MainWindowPrivate(const QStringList&, const bool reset, MainW
     testCaseFilterEdit->setPlaceholderText("Filter Test Output...");
     testCaseFilterEdit->setClearButtonEnabled(true);
 
+    testCaseFilterPassed->setChecked(true);
+    testCaseFilterPassed->setText("Show Passed");
+    testCaseFilterIgnored->setChecked(true);
+    testCaseFilterIgnored->setText("Show Ignored");
+
     // TODO: disable sorting for now -> need to ensure that "TestAll/Suite" doesn't get mixed up
     // TODO: when sort on success -> toggle between time & failure
     testCaseTableView->setSortingEnabled(false);
@@ -148,6 +161,8 @@ MainWindowPrivate::MainWindowPrivate(const QStringList&, const bool reset, MainW
 
     testCaseProxyModel->setFilterCaseSensitivity(Qt::CaseInsensitive);
     testCaseProxyModel->setFilterKeyColumn(-1);
+    testCaseProxyModel->setShowPassed(testCaseFilterPassed->isChecked());
+    testCaseProxyModel->setShowIgnored(testCaseFilterIgnored->isChecked());
 
     failureDock->setObjectName("failureDock");
     failureDock->setAllowedAreas(
@@ -344,6 +359,31 @@ MainWindowPrivate::MainWindowPrivate(const QStringList&, const bool reset, MainW
                 {
                     testCaseTableView->resizeColumnToContents(i);
                 }
+            }
+        }
+    });
+
+    connect(testCaseFilterPassed, &QCheckBox::toggled, this, [this](const bool checked)
+    {
+        testCaseProxyModel->setShowPassed(checked);
+        if (testCaseProxyModel->rowCount())
+        {
+            for (int i = 0; i < testCaseProxyModel->columnCount(); ++i)
+            {
+                testCaseTableView->resizeColumnToContents(i);
+            }
+        }
+    });
+
+
+    connect(testCaseFilterIgnored, &QCheckBox::toggled, this, [this](const bool checked)
+    {
+        testCaseProxyModel->setShowIgnored(checked);
+        if (testCaseProxyModel->rowCount())
+        {
+            for (int i = 0; i < testCaseProxyModel->columnCount(); ++i)
+            {
+                testCaseTableView->resizeColumnToContents(i);
             }
         }
     });
@@ -976,6 +1016,8 @@ void MainWindowPrivate::saveCommonSettings(const QString& path) const
     options.insert("notifyOnSuccess", notifyOnSuccessAction->isChecked());
     options.insert("theme", themeActionGroup->checkedAction()->objectName());
     options.insert("currentRunEnvPath", currentRunEnvPath_);
+    options.insert("testCaseFilterPassed", testCaseFilterPassed->isChecked());
+    options.insert("testCaseFilterIgnored", testCaseFilterIgnored->isChecked());
     root.insert("options", options);
 
     const QJsonDocument document(root);
@@ -1099,6 +1141,8 @@ void MainWindowPrivate::loadCommonSettings(const QString& path)
     themeMenu->findChild<QAction *>(options["theme"].toString())->trigger();
     currentRunEnvPath_ = options["currentRunEnvPath"].toString();
     removeRunEnvAction_->setEnabled(!currentRunEnvPath_.isEmpty());
+    testCaseFilterPassed->setChecked(options["testCaseFilterPassed"].toBool());
+    testCaseFilterIgnored->setChecked(options["testCaseFilterIgnored"].toBool());
 }
 
 void MainWindowPrivate::loadTestSettingsForCurrentRunEnv()

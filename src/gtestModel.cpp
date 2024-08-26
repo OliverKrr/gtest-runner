@@ -101,9 +101,8 @@ QVariant GTestModel::data(const QModelIndex& index, const int role) const
     case Qt::DecorationRole:
         if (index.column() >= 2)
         {
-            if (attributeMap.namedItem("status").nodeValue().contains("notrun"))
-                return QColor(Qt::gray);
-            if (attributeMap.namedItem("status").nodeValue().contains("skipped"))
+            if (attributeMap.namedItem("status").nodeValue().contains("notrun") ||
+                attributeMap.namedItem("result").nodeValue().contains("skipped"))
                 return QColor(Qt::gray);
             if (!attributeMap.namedItem("failures").isNull())
             {
@@ -133,6 +132,13 @@ QVariant GTestModel::data(const QModelIndex& index, const int role) const
         if (attributeMap.namedItem("failures").isNull())
             return node.childNodes().count();
         return attributeMap.namedItem("failures").nodeValue();
+    }
+    case IgnoredRole:
+    {
+        if (attributeMap.namedItem("status").nodeValue().contains("notrun") ||
+            attributeMap.namedItem("result").nodeValue().contains("skipped"))
+            return true;
+        return false;
     }
     default:
         return {};

@@ -57,6 +57,7 @@ public:
     enum Roles
     {
         FailureRole = Qt::UserRole,
+        IgnoredRole
     };
 
     enum Sections

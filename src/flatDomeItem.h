@@ -55,11 +55,22 @@ public:
 
     int parentIndex() const;
 
+    const std::vector<int>& childrenIndex() const
+    {
+        return childrenIndex_;
+    }
+
+    void addChildIndex(int childIndex)
+    {
+        childrenIndex_.emplace_back(childIndex);
+    }
+
 private:
     QDomNode node_;
     int level_;
     int row_;
     int parentIndex_;
+    std::vector<int> childrenIndex_;
 };
 
 using FlatDomeItemPtr = std::shared_ptr<FlatDomeItem>;

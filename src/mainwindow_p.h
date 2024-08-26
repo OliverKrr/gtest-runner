@@ -73,9 +73,11 @@
 #include <QStringListModel>
 #include <QComboBox>
 #include <QSemaphore>
+#include <QCheckBox>
 
 #include <qglobal.h>
 
+class GTestModelSortFilterProxy;
 class TestsController;
 
 //--------------------------------------------------------------------------------------------------
@@ -111,8 +113,10 @@ public:
 
     QFrame* centralFrame; ///< Central widget frame.
     QLineEdit* testCaseFilterEdit; ///< Line edit for filtering test cases.
+    QCheckBox* testCaseFilterPassed;
+    QCheckBox* testCaseFilterIgnored;
     QTableView* testCaseTableView; ///< Table view where the overall test overview is displayed.
-    QSortFilterProxyModel* testCaseProxyModel; ///< Sort/filter proxy for the test-case mode.
+    GTestModelSortFilterProxy* testCaseProxyModel; ///< Sort/filter proxy for the test-case mode.
 
     QDockWidget* failureDock; ///< Dock widget for reporting failures.
     QTreeView* failureTreeView; ///< Tree view for failures.
