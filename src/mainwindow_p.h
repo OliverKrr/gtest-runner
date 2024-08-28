@@ -142,6 +142,7 @@ public:
     QAction* revealExplorerTestAction_;
     QAction* revealExplorerTestResultAction_;
     QAction* runTestAction; ///< Manually forces a test-run.
+    QAction* runFailedTestAction; ///< Manually forces a test-run for only failed tests
     QAction* removeTestAction; ///< Removes a test from being watched.
     // Remove all tests
     QAction* removeAllTestsAction_;
