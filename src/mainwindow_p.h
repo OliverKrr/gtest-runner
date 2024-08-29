@@ -77,6 +77,7 @@
 
 #include <qglobal.h>
 
+class GTestModel;
 class GTestModelSortFilterProxy;
 class TestsController;
 
@@ -211,8 +212,6 @@ signals:
 
     void testProgress(QString path, int complete, int total);
 
-    void runTest(QString path, bool notify);
-
 public:
     explicit MainWindowPrivate(const QStringList& tests, bool reset, MainWindow* q);
 
@@ -222,7 +221,7 @@ public:
                            Qt::CheckState shuffle = Qt::Unchecked,
                            int randomSeed = 0, const QString& otherArgs = "");
 
-    void runTestInThread(const QString& pathToTest, bool notify);
+    void runTestInThread(const QString& pathToTest, const QString& tempTestFilter, bool notify);
 
     bool loadTestResults(const QString& testPath, bool notify);
 
@@ -261,9 +260,7 @@ protected:
 
     void createTestCaseViewContextMenu();
 
-    QString testFilterForAllFailedTests(const QModelIndex& executableIndex) const;
-
-    void testFilterForTestCase(const QModelIndex& testCaseSourceIndex, QString& testFilter) const;
+    QString testFilterForAllFailedTests(const QString& testPath) const;
 
     void createConsoleContextMenu();
 

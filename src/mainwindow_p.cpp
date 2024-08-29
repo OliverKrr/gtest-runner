@@ -256,12 +256,7 @@ MainWindowPrivate::MainWindowPrivate(const QStringList&, const bool reset, MainW
         }
     });
 
-    // TODO: add "run all only failed"
-    // TODO: "run failed" before "run" and with F4
-    // TODO: run failed or selecting only a subset for run should reset the filter afterward
-    //  -> so that next "run all" will really run all and not based on the filter
     // TODO: somehow mark (gray) the column when tests were executed with an active filter?
-
     // TODO: support following options
     //  --gtest_break_on_failure
 
@@ -297,7 +292,7 @@ MainWindowPrivate::MainWindowPrivate(const QStringList&, const bool reset, MainW
                     // Only run after latest update after timeout and not by previous triggers
                     if (currentTime == latestBuildChangeTime_[path])
                     {
-                        emit runTestInThread(path, true);
+                        emit runTestInThread(path, {}, true);
                     }
                 });
             }
@@ -307,10 +302,6 @@ MainWindowPrivate::MainWindowPrivate(const QStringList&, const bool reset, MainW
             }
         }
     });
-
-    // run test when signaled to. Queued connection so that multiple quick invocations will
-    // be collapsed together.
-    connect(this, &MainWindowPrivate::runTest, this, &MainWindowPrivate::runTestInThread, Qt::QueuedConnection);
 
     // update filewatcher when directory changes
     connect(fileWatcher, &QFileSystemWatcher::directoryChanged, [this](const QString& path)
@@ -340,7 +331,7 @@ MainWindowPrivate::MainWindowPrivate(const QStringList&, const bool reset, MainW
                         emit showMessage(
                             "Automatic testing enabled for: " + topLeft.data(Qt::DisplayRole).toString() +
                             ". Re-running tests...");
-                        runTestInThread(topLeft.data(QExecutableModel::PathRole).toString(), true);
+                        runTestInThread(topLeft.data(QExecutableModel::PathRole).toString(), {}, true);
                     }
                 }
 
@@ -614,7 +605,7 @@ void MainWindowPrivate::addTestExecutable(const QString& path, const QString& na
     // only run if test has run before and is out of date now
     if (outOfDate && previousResults && autorun)
     {
-        this->runTestInThread(path, false);
+        this->runTestInThread(path, {}, false);
     }
     else if (outOfDate)
     {
@@ -625,9 +616,9 @@ void MainWindowPrivate::addTestExecutable(const QString& path, const QString& na
 //--------------------------------------------------------------------------------------------------
 //	FUNCTION: runTestInThread
 //--------------------------------------------------------------------------------------------------
-void MainWindowPrivate::runTestInThread(const QString& pathToTest, bool notify)
+void MainWindowPrivate::runTestInThread(const QString& pathToTest, const QString& tempTestFilter, bool notify)
 {
-    std::thread t([this, pathToTest, notify]
+    std::thread t([this, pathToTest, tempTestFilter, notify]
     {
         QEventLoop loop;
 
@@ -776,8 +767,21 @@ void MainWindowPrivate::runTestInThread(const QString& pathToTest, bool notify)
         const QString gtestFileName = outputDir + "/" + currentTime + "_" + GTEST_RESULT_NAME;
         arguments << "--gtest_output=xml:\"" + gtestFileName + "\"";
 
-        const QString filter = executableModel->data(index, QExecutableModel::FilterRole).toString();
-        if (!filter.isEmpty()) arguments << "--gtest_filter=" + filter;
+        // Take temp test filter if given. Otherwise, take configured
+        if (!tempTestFilter.isEmpty())
+        {
+            arguments << "--gtest_filter=" + tempTestFilter;
+            emit testOutputReady("Run Test '" + pathToTest +  "' with temporary filter:\n" + tempTestFilter + "\n\n");
+        }
+        else
+        {
+            const QString filter = executableModel->data(index, QExecutableModel::FilterRole).toString();
+            if (!filter.isEmpty())
+            {
+                arguments << "--gtest_filter=" + filter;
+                emit testOutputReady("Run Test '" + pathToTest +  "' with fixed filter:\n" + filter + "\n\n");
+            }
+        }
 
         const QString repeat = executableModel->data(index, QExecutableModel::RepeatTestsRole).toString();
         if (repeat != "0" && repeat != "1") arguments << "--gtest_repeat=" + repeat;
@@ -1303,7 +1307,7 @@ void MainWindowPrivate::createToolBar()
     runAllTestsAction = new QAction(QIcon(":images/runTest"), "Run All Tests", toolBar_);
     runAllTestsAction->setShortcut(QKeySequence(Qt::Key_F6));
     killAllTestsAction_ = new QAction(q->style()->standardIcon(QStyle::SP_BrowserStop), "Kill All Tests", toolBar_);
-    killAllTestsAction_->setShortcuts({QKeySequence(Qt::SHIFT + Qt::Key_F4), QKeySequence(Qt::SHIFT + Qt::Key_F6)});
+    killAllTestsAction_->setShortcuts({QKeySequence(Qt::SHIFT + Qt::Key_F6), QKeySequence(Qt::SHIFT + Qt::Key_F4)});
     revealExplorerTestResultAction_ = new QAction(q->style()->standardIcon(QStyle::SP_DirOpenIcon),
                                                   "Reveal Test Result Dir", toolBar_);
     removeAllTestsAction_ = new QAction(q->style()->standardIcon(QStyle::SP_TrashIcon), "Remove All Tests", toolBar_);
@@ -1393,11 +1397,11 @@ void MainWindowPrivate::createToolBar()
         for (int i = 0; i < executableTreeView->model()->rowCount(); ++i)
         {
             QModelIndex index = executableTreeView->model()->index(i, 0);
-            const QString testFilter = testFilterForAllFailedTests(index);
+            const QString path = index.data(QExecutableModel::PathRole).toString();
+            const QString testFilter = testFilterForAllFailedTests(path);
             if (!testFilter.isEmpty())
             {
-                executableModel->setData(index, testFilter, QExecutableModel::FilterRole);
-                runTestInThread(index.data(QExecutableModel::PathRole).toString(), false);
+                runTestInThread(path, testFilter, false);
             }
         }
     });
@@ -1407,7 +1411,7 @@ void MainWindowPrivate::createToolBar()
         for (int i = 0; i < executableTreeView->model()->rowCount(); ++i)
         {
             QModelIndex index = executableTreeView->model()->index(i, 0);
-            runTestInThread(index.data(QExecutableModel::PathRole).toString(), false);
+            runTestInThread(index.data(QExecutableModel::PathRole).toString(), {}, false);
         }
     });
 
@@ -1528,7 +1532,7 @@ void MainWindowPrivate::createExecutableContextMenu()
     runTestAction = new QAction(QIcon(":images/runTest"), "Run Test", executableTreeView);
     runTestAction->setShortcut(QKeySequence(Qt::Key_F5));
     killTestAction = new QAction(q->style()->standardIcon(QStyle::SP_BrowserStop), "Kill Test", executableTreeView);
-    killTestAction->setShortcuts({QKeySequence(Qt::SHIFT + Qt::Key_F3), QKeySequence(Qt::SHIFT + Qt::Key_F5)});
+    killTestAction->setShortcuts({QKeySequence(Qt::SHIFT + Qt::Key_F5), QKeySequence(Qt::SHIFT + Qt::Key_F3)});
     revealExplorerTestAction_ = new QAction(q->style()->standardIcon(QStyle::SP_DirOpenIcon), "Reveal Test Results",
                                             executableTreeView);
 
@@ -1597,12 +1601,11 @@ void MainWindowPrivate::createExecutableContextMenu()
     connect(runFailedTestAction, &QAction::triggered, [this]
     {
         const QModelIndex index = executableTreeView->currentIndex();
-        const QString testFilter = testFilterForAllFailedTests(index);
+        const QString path = index.data(QExecutableModel::PathRole).toString();
+        const QString testFilter = testFilterForAllFailedTests(path);
         if (!testFilter.isEmpty())
         {
-            executableModel->setData(index, testFilter, QExecutableModel::FilterRole);
-            const QString path = index.data(QExecutableModel::PathRole).toString();
-            runTestInThread(path, false);
+            runTestInThread(path, testFilter, false);
         }
     });
 
@@ -1610,7 +1613,7 @@ void MainWindowPrivate::createExecutableContextMenu()
     {
         const QModelIndex index = executableTreeView->currentIndex();
         const QString path = index.data(QExecutableModel::PathRole).toString();
-        runTestInThread(path, false);
+        runTestInThread(path, {}, false);
     });
 
     connect(killTestAction, &QAction::triggered, [this]
@@ -1635,32 +1638,13 @@ void MainWindowPrivate::createExecutableContextMenu()
     });
 }
 
-QString MainWindowPrivate::testFilterForAllFailedTests(const QModelIndex& executableIndex) const
+namespace
 {
-    QString testFilter;
-    for (int i = 0; i < testCaseProxyModel->sourceModel()->rowCount(); ++i)
-    {
-        const auto testCaseSourceIndex = testCaseProxyModel->sourceModel()->index(i, GTestModel::Name);
-        const FlatDomeItemPtr item = static_cast<GTestModel *>(testCaseProxyModel->sourceModel())->itemForIndex(
-            testCaseSourceIndex);
-        // Only check TestCases
-        if (item &&
-            item->level() == 2)
-        {
-            if (testCaseProxyModel->sourceModel()->data(testCaseSourceIndex, GTestModel::FailureRole).toInt() != 0)
-            {
-                testFilterForTestCase(testCaseSourceIndex, testFilter);
-            }
-        }
-    }
-    return testFilter;
-}
-
-void MainWindowPrivate::testFilterForTestCase(const QModelIndex& testCaseSourceIndex, QString& testFilter) const
+void testFilterForTestCase(const GTestModel& testModel, const QModelIndex& testIndex, QString& testFilter)
 {
-    const auto testCaseName = testCaseSourceIndex.data(Qt::DisplayRole).toString().trimmed();
-    const FlatDomeItemPtr item = static_cast<GTestModel *>(testCaseProxyModel->sourceModel())->itemForIndex(testCaseSourceIndex);
-    const auto testSuiteIndex = testCaseProxyModel->sourceModel()->index(item->parentIndex(), GTestModel::Sections::Name);
+    const auto testCaseName = testIndex.data(Qt::DisplayRole).toString().trimmed();
+    const FlatDomeItemPtr item = testModel.itemForIndex(testIndex);
+    const auto testSuiteIndex = testModel.index(item->parentIndex(), GTestModel::Sections::Name);
     const auto testSuiteName = testSuiteIndex.data(Qt::DisplayRole).toString().trimmed();
 
     if (!testFilter.isEmpty())
@@ -1677,6 +1661,28 @@ void MainWindowPrivate::testFilterForTestCase(const QModelIndex& testCaseSourceI
     {
         testFilter += testCaseName;
     }
+}
+}
+
+QString MainWindowPrivate::testFilterForAllFailedTests(const QString& testPath) const
+{
+    QString testFilter;
+    const auto testModel = testsController_->gTestModel(testPath);
+    for (int i = 0; i < testModel->rowCount(); ++i)
+    {
+        const auto testCaseSourceIndex = testModel->index(i, GTestModel::Name);
+        const FlatDomeItemPtr item = testModel->itemForIndex(testCaseSourceIndex);
+        // Only check TestCases
+        if (item &&
+            item->level() == 2)
+        {
+            if (testModel->data(testCaseSourceIndex, GTestModel::FailureRole).toInt() != 0)
+            {
+                testFilterForTestCase(*testModel, testCaseSourceIndex, testFilter);
+            }
+        }
+    }
+    return testFilter;
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -1787,7 +1793,8 @@ void MainWindowPrivate::createTestCaseViewContextMenu()
             }
             case TestCase:
             {
-                testFilterForTestCase(testCaseSourceIndex, testFilter);
+                testFilterForTestCase(*static_cast<GTestModel *>(testCaseProxyModel->sourceModel()),
+                testCaseSourceIndex, testFilter);
                 break;
             }
             default:
@@ -1796,9 +1803,8 @@ void MainWindowPrivate::createTestCaseViewContextMenu()
         }
 
         const QModelIndex execIndex = executableTreeView->selectionModel()->currentIndex();
-        executableModel->setData(execIndex, testFilter, QExecutableModel::FilterRole);
         const QString path = execIndex.data(QExecutableModel::PathRole).toString();
-        runTestInThread(path, false);
+        runTestInThread(path, testFilter, false);
     });
 }
 
@@ -1853,6 +1859,7 @@ void MainWindowPrivate::createTestMenu()
     testMenu->addAction(addRunEnvAction);
     testMenu->addAction(removeRunEnvAction_);
     testMenu->addSeparator();
+    testMenu->addAction(runAllFailedTestsAction);
     testMenu->addAction(runAllTestsAction);
     testMenu->addAction(killAllTestsAction_);
     testMenu->addAction(revealExplorerTestResultAction_);
