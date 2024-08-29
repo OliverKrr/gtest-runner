@@ -141,8 +141,8 @@ public:
     // Reveal Test Results in Explorer
     QAction* revealExplorerTestAction_;
     QAction* revealExplorerTestResultAction_;
-    QAction* runTestAction; ///< Manually forces a test-run.
     QAction* runFailedTestAction; ///< Manually forces a test-run for only failed tests
+    QAction* runTestAction; ///< Manually forces a test-run.
     QAction* removeTestAction; ///< Removes a test from being watched.
     // Remove all tests
     QAction* removeAllTestsAction_;
@@ -163,6 +163,7 @@ public:
     QAction* removeRunEnvAction_;
     // Kills all running test
     QAction* killAllTestsAction_; ///< program options.
+    QAction* runAllFailedTestsAction; ///< Run all failed tests in the list.
     QAction* runAllTestsAction; ///< Run all tests in the list.
 
     QMenu* testCaseViewContextMenu; ///< Context menu for the test case tree view
@@ -259,6 +260,10 @@ protected:
     void createExecutableContextMenu();
 
     void createTestCaseViewContextMenu();
+
+    QString testFilterForAllFailedTests(const QModelIndex& executableIndex) const;
+
+    void testFilterForTestCase(const QModelIndex& testCaseSourceIndex, QString& testFilter) const;
 
     void createConsoleContextMenu();
 

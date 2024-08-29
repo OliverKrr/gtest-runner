@@ -257,6 +257,10 @@ MainWindowPrivate::MainWindowPrivate(const QStringList&, const bool reset, MainW
     });
 
     // TODO: add "run all only failed"
+    // TODO: "run failed" before "run" and with F4
+    // TODO: run failed or selecting only a subset for run should reset the filter afterward
+    //  -> so that next "run all" will really run all and not based on the filter
+    // TODO: somehow mark (gray) the column when tests were executed with an active filter?
 
     // TODO: support following options
     //  --gtest_break_on_failure
@@ -1294,10 +1298,12 @@ void MainWindowPrivate::createToolBar()
     removeRunEnvAction_->setToolTip(
         "Removes current Run Environment (doesn't delete test data). If you want to remove test data, you have to do it manually.");
 
+    runAllFailedTestsAction = new QAction(QIcon(":images/runFailedTests"), "Run All Failed Tests", toolBar_);
+    runAllFailedTestsAction->setShortcut(QKeySequence(Qt::Key_F4));
     runAllTestsAction = new QAction(QIcon(":images/runTest"), "Run All Tests", toolBar_);
     runAllTestsAction->setShortcut(QKeySequence(Qt::Key_F6));
     killAllTestsAction_ = new QAction(q->style()->standardIcon(QStyle::SP_BrowserStop), "Kill All Tests", toolBar_);
-    killAllTestsAction_->setShortcut(QKeySequence(Qt::SHIFT + Qt::Key_F6));
+    killAllTestsAction_->setShortcuts({QKeySequence(Qt::SHIFT + Qt::Key_F4), QKeySequence(Qt::SHIFT + Qt::Key_F6)});
     revealExplorerTestResultAction_ = new QAction(q->style()->standardIcon(QStyle::SP_DirOpenIcon),
                                                   "Reveal Test Result Dir", toolBar_);
     removeAllTestsAction_ = new QAction(q->style()->standardIcon(QStyle::SP_TrashIcon), "Remove All Tests", toolBar_);
@@ -1308,6 +1314,7 @@ void MainWindowPrivate::createToolBar()
     toolBar_->addAction(removeRunEnvAction_);
     toolBar_->addSeparator();
     toolBar_->addWidget(new QLabel("All:", toolBar_));
+    toolBar_->addAction(runAllFailedTestsAction);
     toolBar_->addAction(runAllTestsAction);
     toolBar_->addAction(killAllTestsAction_);
     toolBar_->addAction(revealExplorerTestResultAction_);
@@ -1378,6 +1385,20 @@ void MainWindowPrivate::createToolBar()
                 loadTestSettingsForCurrentRunEnv();
             }
             removeRunEnvAction_->setEnabled(!currentRunEnvPath_.isEmpty());
+        }
+    });
+
+    connect(runAllFailedTestsAction, &QAction::triggered, [this]
+    {
+        for (int i = 0; i < executableTreeView->model()->rowCount(); ++i)
+        {
+            QModelIndex index = executableTreeView->model()->index(i, 0);
+            const QString testFilter = testFilterForAllFailedTests(index);
+            if (!testFilter.isEmpty())
+            {
+                executableModel->setData(index, testFilter, QExecutableModel::FilterRole);
+                runTestInThread(index.data(QExecutableModel::PathRole).toString(), false);
+            }
         }
     });
 
@@ -1502,24 +1523,24 @@ void MainWindowPrivate::createExecutableContextMenu()
     executableContextMenu = new QMenu(executableTreeView);
     executableContextMenu->setToolTipsVisible(true);
 
+    runFailedTestAction = new QAction(QIcon(":images/runFailedTests"), "Run Failed Tests", executableTreeView);
+    runFailedTestAction->setShortcut(QKeySequence(Qt::Key_F3));
     runTestAction = new QAction(QIcon(":images/runTest"), "Run Test", executableTreeView);
     runTestAction->setShortcut(QKeySequence(Qt::Key_F5));
-    runFailedTestAction = new QAction(QIcon(":images/runFailedTests"), "Run Failed Tests", executableTreeView);
-    runFailedTestAction->setShortcut(QKeySequence(Qt::Key_F7));
     killTestAction = new QAction(q->style()->standardIcon(QStyle::SP_BrowserStop), "Kill Test", executableTreeView);
-    killTestAction->setShortcut(QKeySequence(Qt::SHIFT + Qt::Key_F5));
+    killTestAction->setShortcuts({QKeySequence(Qt::SHIFT + Qt::Key_F3), QKeySequence(Qt::SHIFT + Qt::Key_F5)});
     revealExplorerTestAction_ = new QAction(q->style()->standardIcon(QStyle::SP_DirOpenIcon), "Reveal Test Results",
                                             executableTreeView);
 
     removeTestAction = new QAction(q->style()->standardIcon(QStyle::SP_TrashIcon), "Remove Test", executableTreeView);
 
     // Also add here for shortcut
-    executableTreeView->addAction(runTestAction);
     executableTreeView->addAction(runFailedTestAction);
+    executableTreeView->addAction(runTestAction);
     executableTreeView->addAction(killTestAction);
 
-    executableContextMenu->addAction(runTestAction);
     executableContextMenu->addAction(runFailedTestAction);
+    executableContextMenu->addAction(runTestAction);
     executableContextMenu->addAction(killTestAction);
     executableContextMenu->addAction(revealExplorerTestAction_);
     executableContextMenu->addSeparator();
@@ -1532,7 +1553,6 @@ void MainWindowPrivate::createExecutableContextMenu()
         if (index.isValid())
         {
             const bool isTestRunning = testRunningHash[index.data(QExecutableModel::PathRole).toString()];
-            runTestAction->setEnabled(true);
             bool anyTestFailed = false;
             if (testCaseProxyModel->sourceModel())
             {
@@ -1545,6 +1565,7 @@ void MainWindowPrivate::createExecutableContextMenu()
                 }
             }
             runFailedTestAction->setEnabled(anyTestFailed);
+            runTestAction->setEnabled(true);
             killTestAction->setEnabled(isTestRunning);
             revealExplorerTestAction_->setEnabled(
                 QDir(xmlPath(index.data(QExecutableModel::PathRole).toString())).exists());
@@ -1552,8 +1573,8 @@ void MainWindowPrivate::createExecutableContextMenu()
         }
         else
         {
-            runTestAction->setEnabled(false);
             runFailedTestAction->setEnabled(false);
+            runTestAction->setEnabled(false);
             killTestAction->setEnabled(false);
             revealExplorerTestAction_->setEnabled(false);
             removeTestAction->setEnabled(false);
@@ -1573,51 +1594,21 @@ void MainWindowPrivate::createExecutableContextMenu()
         executableContextMenu->exec(executableTreeView->mapToGlobal(pos));
     });
 
-    connect(runTestAction, &QAction::triggered, [this]
-    {
-        const QModelIndex index = executableTreeView->currentIndex();
-        const QString path = index.data(QExecutableModel::PathRole).toString();
-        runTestInThread(path, false);
-    });
-
     connect(runFailedTestAction, &QAction::triggered, [this]
     {
         const QModelIndex index = executableTreeView->currentIndex();
-        QString testFilter;
-        for (int i = 0; i < testCaseProxyModel->sourceModel()->rowCount(); ++i)
+        const QString testFilter = testFilterForAllFailedTests(index);
+        if (!testFilter.isEmpty())
         {
-            const auto testCaseSourceIndex = testCaseProxyModel->sourceModel()->index(i, GTestModel::Name);
-            const FlatDomeItemPtr item = static_cast<GTestModel *>(testCaseProxyModel->sourceModel())->itemForIndex(
-                testCaseSourceIndex);
-            // Only check TestCases
-            if (item &&
-                item->level() == 2)
-            {
-                if (testCaseProxyModel->sourceModel()->data(testCaseSourceIndex, GTestModel::FailureRole).toInt() != 0)
-                {
-                    const auto testCaseName = testCaseSourceIndex.data(Qt::DisplayRole).toString().trimmed();
-                    const auto testSuiteIndex = testCaseProxyModel->sourceModel()->index(
-                        item->parentIndex(), GTestModel::Sections::Name);
-                    const auto testSuiteName = testSuiteIndex.data(Qt::DisplayRole).toString().trimmed();
-
-                    if (!testFilter.isEmpty())
-                    {
-                        testFilter += ":";
-                    }
-                    testFilter += testSuiteName + ".";
-                    if (testCaseName.contains(" ("))
-                    {
-                        // name contains (value_param)
-                        testFilter += testCaseName.split(" (")[0];
-                    }
-                    else
-                    {
-                        testFilter += testCaseName;
-                    }
-                }
-            }
+            executableModel->setData(index, testFilter, QExecutableModel::FilterRole);
+            const QString path = index.data(QExecutableModel::PathRole).toString();
+            runTestInThread(path, false);
         }
-        executableModel->setData(index, testFilter, QExecutableModel::FilterRole);
+    });
+
+    connect(runTestAction, &QAction::triggered, [this]
+    {
+        const QModelIndex index = executableTreeView->currentIndex();
         const QString path = index.data(QExecutableModel::PathRole).toString();
         runTestInThread(path, false);
     });
@@ -1642,6 +1633,50 @@ void MainWindowPrivate::createExecutableContextMenu()
     {
         removeTest(executableTreeView->currentIndex());
     });
+}
+
+QString MainWindowPrivate::testFilterForAllFailedTests(const QModelIndex& executableIndex) const
+{
+    QString testFilter;
+    for (int i = 0; i < testCaseProxyModel->sourceModel()->rowCount(); ++i)
+    {
+        const auto testCaseSourceIndex = testCaseProxyModel->sourceModel()->index(i, GTestModel::Name);
+        const FlatDomeItemPtr item = static_cast<GTestModel *>(testCaseProxyModel->sourceModel())->itemForIndex(
+            testCaseSourceIndex);
+        // Only check TestCases
+        if (item &&
+            item->level() == 2)
+        {
+            if (testCaseProxyModel->sourceModel()->data(testCaseSourceIndex, GTestModel::FailureRole).toInt() != 0)
+            {
+                testFilterForTestCase(testCaseSourceIndex, testFilter);
+            }
+        }
+    }
+    return testFilter;
+}
+
+void MainWindowPrivate::testFilterForTestCase(const QModelIndex& testCaseSourceIndex, QString& testFilter) const
+{
+    const auto testCaseName = testCaseSourceIndex.data(Qt::DisplayRole).toString().trimmed();
+    const FlatDomeItemPtr item = static_cast<GTestModel *>(testCaseProxyModel->sourceModel())->itemForIndex(testCaseSourceIndex);
+    const auto testSuiteIndex = testCaseProxyModel->sourceModel()->index(item->parentIndex(), GTestModel::Sections::Name);
+    const auto testSuiteName = testSuiteIndex.data(Qt::DisplayRole).toString().trimmed();
+
+    if (!testFilter.isEmpty())
+    {
+        testFilter += ":";
+    }
+    testFilter += testSuiteName + ".";
+    if (testCaseName.contains(" ("))
+    {
+        // name contains (value_param)
+        testFilter += testCaseName.split(" (")[0];
+    }
+    else
+    {
+        testFilter += testCaseName;
+    }
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -1752,25 +1787,7 @@ void MainWindowPrivate::createTestCaseViewContextMenu()
             }
             case TestCase:
             {
-                const auto testCaseName = testCaseSourceIndex.data(Qt::DisplayRole).toString().trimmed();
-                const FlatDomeItemPtr item = static_cast<GTestModel *>(testCaseProxyModel->sourceModel())->itemForIndex(testCaseSourceIndex);
-                const auto testSuiteIndex = testCaseProxyModel->sourceModel()->index(item->parentIndex(), GTestModel::Sections::Name);
-                const auto testSuiteName = testSuiteIndex.data(Qt::DisplayRole).toString().trimmed();
-
-                if (!testFilter.isEmpty())
-                {
-                    testFilter += ":";
-                }
-                testFilter += testSuiteName + ".";
-                if (testCaseName.contains(" ("))
-                {
-                    // name contains (value_param)
-                    testFilter += testCaseName.split(" (")[0];
-                }
-                else
-                {
-                    testFilter += testCaseName;
-                }
+                testFilterForTestCase(testCaseSourceIndex, testFilter);
                 break;
             }
             default:
