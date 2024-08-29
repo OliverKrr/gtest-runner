@@ -60,121 +60,122 @@ class QExecutableModelPrivate;
 //--------------------------------------------------------------------------------------------------
 struct ExecutableData
 {
-	enum States
-	{
-		NOT_RUNNING,
-		RUNNING,
-		PASSED,
-		FAILED,
-	};
+    enum States
+    {
+        NOT_RUNNING,
+        RUNNING,
+        PASSED,
+        FAILED,
+    };
 
-	/// allow implicit path conversion to help search the model
-	ExecutableData(QString path = "") : path(std::move(path)) {};
+    /// allow implicit path conversion to help search the model
+    ExecutableData(QString path = {}) : path(std::move(path))
+    {
+    };
 
-	QString			path;				///< Full, absolute path to test executable
-        QString			name;				///< Display name of test executable
-        QString			testDriver;			///< Full, absolute path to test driver
-	bool			autorun;			///< Whether to autorun the tests when they change.
-	States			state;				///< Current state of test execution
-	QDateTime		lastModified;		///< Last time the executable was modified
-	double			progress;			///< Test run completeness, from 0 to 100
-	QString			filter;				///< filter to be applied on gtest command line
-	int				repeat;				///< Number of times to repeat the test. Can be -1.
-	Qt::CheckState	runDisabled;		///< gtest command line to run disabled tests
-        Qt::CheckState	failFast;		///< gtest command line to fail fast
-	Qt::CheckState	shuffle;			///< gtest command line option to shuffle tests
-	int				randomSeed;			///< Random seed for the shuffle
-	QString			otherArgs;			///< any other dumb-ass args the user thinks I forgot.
+    QString path; ///< Full, absolute path to test executable
+    QString name; ///< Display name of test executable
+    QString testDriver; ///< Full, absolute path to test driver
+    bool autorun; ///< Whether to autorun the tests when they change.
+    States state; ///< Current state of test execution
+    QDateTime lastModified; ///< Last time the executable was modified
+    double progress; ///< Test run completeness, from 0 to 100
+    QString filter; ///< filter to be applied on gtest command line
+    int repeat; ///< Number of times to repeat the test. Can be -1.
+    Qt::CheckState runDisabled; ///< gtest command line to run disabled tests
+    Qt::CheckState failFast; ///< gtest command line to fail fast
+    Qt::CheckState shuffle; ///< gtest command line option to shuffle tests
+    int randomSeed; ///< Random seed for the shuffle
+    QString otherArgs; ///< any other dumb-ass args the user thinks I forgot.
 
-	/// executable data needs to be unique per-path, so that's a good equality check
-	friend bool operator==(const ExecutableData& lhs, const ExecutableData& rhs)
-	{
-		return lhs.path == rhs.path;
-	}
+    /// executable data needs to be unique per-path, so that's a good equality check
+    friend bool operator==(const ExecutableData& lhs, const ExecutableData& rhs)
+    {
+        return lhs.path == rhs.path;
+    }
 
-	friend bool operator!=(const ExecutableData& lhs, const ExecutableData& rhs)
-	{
-		return !(lhs == rhs);
-	}
-
-};	// CLASS: ExecutableData
+    friend bool operator!=(const ExecutableData& lhs, const ExecutableData& rhs)
+    {
+        return !(lhs == rhs);
+    }
+}; // CLASS: ExecutableData
 
 //--------------------------------------------------------------------------------------------------
 //	CLASS: QExecutableModel
 //--------------------------------------------------------------------------------------------------
 /// @brief		model for test executables
-/// @details	
+/// @details
 //--------------------------------------------------------------------------------------------------
 class QExecutableModel final : public QTreeModel<ExecutableData>
 {
 public:
+    enum Columns
+    {
+        AdvancedOptionsColumn,
+        NameColumn,
+        ProgressColumn,
+    };
 
-	enum Columns
-	{
-		AdvancedOptionsColumn,
-		NameColumn,
-		ProgressColumn,
-	};
+    enum Roles
+    {
+        PathRole = Qt::ToolTipRole,
+        StateRole = Qt::UserRole,
+        LastModifiedRole,
+        ProgressRole,
+        FilterRole,
+        RepeatTestsRole,
+        RunDisabledTestsRole,
+        FailFastRole,
+        ShuffleRole,
+        RandomSeedRole,
+        ArgsRole,
+        NameRole,
+        AutorunRole,
+        TestDriverRole
+    };
 
-	enum Roles
-	{
-		PathRole = Qt::ToolTipRole,
-		StateRole = Qt::UserRole,
-		LastModifiedRole = Qt::UserRole + 1,
-		ProgressRole = Qt::UserRole + 2,
-		FilterRole = Qt::UserRole + 3,
-		RepeatTestsRole = Qt::UserRole + 4,
-		RunDisabledTestsRole = Qt::UserRole + 5,
-                FailFastRole = Qt::UserRole + 6,
-		ShuffleRole = Qt::UserRole + 7,
-		RandomSeedRole = Qt::UserRole + 8,
-		ArgsRole = Qt::UserRole + 9,
-		NameRole = Qt::UserRole + 10,
-		AutorunRole = Qt::UserRole + 11,
-                TestDriverRole = Qt::UserRole + 12,
-	};
+    explicit QExecutableModel(QObject* parent = nullptr);
 
- 	explicit QExecutableModel(QObject* parent = nullptr);
+    Q_INVOKABLE int columnCount(const QModelIndex& parent = QModelIndex()) const override;
 
- 	Q_INVOKABLE int columnCount(const QModelIndex &parent = QModelIndex()) const override;
-	Q_INVOKABLE QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
-	Q_INVOKABLE bool setData(const QModelIndex &index, const QVariant &value, int role = Qt::EditRole) override;
-	Q_INVOKABLE Qt::DropActions supportedDropActions() const override;
+    Q_INVOKABLE QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const override;
 
-	Qt::DropActions supportedDragActions() const override;
+    Q_INVOKABLE bool setData(const QModelIndex& index, const QVariant& value, int role = Qt::EditRole) override;
 
-	Qt::ItemFlags flags(const QModelIndex &index) const override;
+    Q_INVOKABLE Qt::DropActions supportedDropActions() const override;
 
-	bool removeRows(int row, int count, const QModelIndex &parent = QModelIndex()) override;
+    Qt::DropActions supportedDragActions() const override;
 
-	QModelIndex removeRow(int row, const QModelIndex &parent = QModelIndex()) override;
+    Qt::ItemFlags flags(const QModelIndex& index) const override;
 
-	QModelIndex	index(int row, int column, const QModelIndex &parent = QModelIndex()) const override;
+    bool removeRows(int row, int count, const QModelIndex& parent = QModelIndex()) override;
 
-	bool moveRows(const QModelIndex &sourceParent, int sourceRow, int count, const QModelIndex &destinationParent, int destinationChild) override;
+    QModelIndex removeRow(int row, const QModelIndex& parent = QModelIndex()) override;
 
-	QMap<int, QVariant> itemData(const QModelIndex &index) const override;
+    QModelIndex index(int row, int column, const QModelIndex& parent = QModelIndex()) const override;
 
-	bool setItemData(const QModelIndex &index, const QMap<int, QVariant> &roles) override;
+    bool moveRows(const QModelIndex& sourceParent, int sourceRow, int count, const QModelIndex& destinationParent,
+                  int destinationChild) override;
 
-	bool insertRows(int row, int count, const QModelIndex &parent = QModelIndex()) override;
+    QMap<int, QVariant> itemData(const QModelIndex& index) const override;
 
-	bool dropMimeData(const QMimeData *data, Qt::DropAction action, int row, int column, const QModelIndex &parent) override;
+    bool setItemData(const QModelIndex& index, const QMap<int, QVariant>& roles) override;
 
-	QStringList mimeTypes() const override;
+    bool insertRows(int row, int count, const QModelIndex& parent = QModelIndex()) override;
 
-	QMimeData * mimeData(const QModelIndexList &indexes) const override;
+    bool dropMimeData(const QMimeData* data, Qt::DropAction action, int row, int column,
+                      const QModelIndex& parent) override;
+
+    QStringList mimeTypes() const override;
+
+    QMimeData* mimeData(const QModelIndexList& indexes) const override;
 
 
-	/// return an index from a path
-	QModelIndex index(const QString& path) const;
-
-
+    /// return an index from a path
+    QModelIndex index(const QString& path) const;
 
 private:
+    Q_DECLARE_PRIVATE(QExecutableModel);
 
-	Q_DECLARE_PRIVATE(QExecutableModel);
-
-	QScopedPointer<QExecutableModelPrivate>	d_ptr;
-
-};	// CLASS: QExecutableModel
+    QScopedPointer<QExecutableModelPrivate> d_ptr;
+}; // CLASS: QExecutableModel
