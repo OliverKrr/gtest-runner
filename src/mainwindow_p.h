@@ -221,7 +221,7 @@ public:
                            Qt::CheckState shuffle = Qt::Unchecked,
                            int randomSeed = 0, const QString& otherArgs = "");
 
-    void runTestInThread(const QString& pathToTest, const QString& tempTestFilter, bool notify);
+    void runTestInThread(const QString& pathToTest, const QString& tempTestFilter, bool notify, bool listTests);
 
     bool loadTestResults(const QString& testPath, bool notify);
 

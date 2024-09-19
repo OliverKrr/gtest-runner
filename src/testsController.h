@@ -39,10 +39,11 @@
 #include <QObject>
 #include <QDomDocument>
 #include <QString>
+#include <QDateTime>
+#include <QDir>
 #include <map>
 #include <vector>
 #include <memory>
-#include <qdir.h>
 
 class GTestModel;
 
@@ -91,11 +92,13 @@ private:
     struct TestResultData
     {
         QString testResultFile_;
+        QDateTime lastModified_;
         QDomDocument dom_;
     };
 
     struct TestData
     {
+        TestResultData testOverview_;
         /* Results should be sorted by time with the oldest first. */
         std::vector<TestResultData> testResults_;
         std::shared_ptr<GTestModel> gtestModel_;
@@ -118,7 +121,8 @@ private:
 
     static QStringList testResultFiles(const QString& basicPath, QDir::SortFlags sortFlag);
 
-    static bool addTestResultData(const QString& path, const QString& testResultFile, const TestDataPtr& testData);
+    static bool addTestResultData(const QString& path, const QString& testResultFile, const TestDataPtr& testData,
+                                  bool isOverview);
 
     static bool loadTestResultXml(const QString& pathToTestXml, QDomDocument& doc);
 

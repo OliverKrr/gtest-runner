@@ -40,6 +40,7 @@
 
 
 const QString TEST_DRIVER_NAME = "TestDriver.py";
+const QString GTEST_LIST_NAME = "gtest-runner_list.xml";
 const QString GTEST_RESULT_NAME = "gtest-runner_result.xml";
 const QString LATEST_RESULT_DIR_NAME = "latest";
 const QString DATE_FORMAT = "yyyy.MM.dd_hh.mm.ss.zzz";

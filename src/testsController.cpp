@@ -59,16 +59,17 @@ void TestsController::addTest(const QString& path)
 
     for (const auto& testResultFile : testResultFiles(xmlPath(path), QDir::Time | QDir::Reversed))
     {
-        addTestResultData(path, testResultFile, testData);
+        const bool isOverview = testResultFile.endsWith(GTEST_LIST_NAME);
+        addTestResultData(path, testResultFile, testData, isOverview);
     }
 
-    // TODO: OVERVIEW: add button to update overview
-    // TODO: OVERVIEW: check if useful to always auto-run? -> make global option
-    //  --gtest_list_tests
-
-    // TODO: OVERVIEW: No overview -> take last result
-    if (!testData->testResults_.empty())
+    if (!testData->testOverview_.lastModified_.isNull())
     {
+        testData->gtestModel_->updateOverviewDocument(testData->testOverview_.dom_);
+    }
+    else if (!testData->testResults_.empty())
+    {
+        // No overview -> use latest as fallback
         testData->gtestModel_->updateOverviewDocument(testData->testResults_.back().dom_);
     }
 
@@ -101,7 +102,23 @@ bool TestsController::loadLatestTestResult(const QString& path, int& numberError
     const TestDataPtr& testData = iter->second;
 
     // Check for new executed test
-    const auto currentResultFiles = testResultFiles(xmlPath(path), QDir::Time);
+    auto currentResultFiles = testResultFiles(xmlPath(path), QDir::Time);
+    bool hasOverview = false;
+    for (auto resultIter = currentResultFiles.begin(); resultIter != currentResultFiles.end(); ++resultIter)
+    {
+        if (resultIter->endsWith(GTEST_LIST_NAME))
+        {
+            hasOverview = true;
+            if (addTestResultData(path, *resultIter, testData, true))
+            {
+                testData->gtestModel_->updateOverviewDocument(testData->testOverview_.dom_);
+                testData->gtestModel_->updateModel();
+            }
+            currentResultFiles.erase(resultIter);
+            break;
+        }
+    }
+
     if (currentResultFiles.empty())
     {
         // No executed test
@@ -111,14 +128,17 @@ bool TestsController::loadLatestTestResult(const QString& path, int& numberError
     if (testData->testResults_.empty() ||
         testData->testResults_.back().testResultFile_ != currentResultFiles.front())
     {
-        if (!addTestResultData(path, currentResultFiles.front(), testData))
+        if (!addTestResultData(path, currentResultFiles.front(), testData, false))
         {
             return false;
         }
 
         const auto& latestTestResult = testData->testResults_.back();
-        // TODO: OVERVIEW: if we don't have overview xml -> need to update model here
-        testData->gtestModel_->updateOverviewDocument(latestTestResult.dom_);
+        if (!hasOverview)
+        {
+            // if we don't have overview xml -> use latest
+            testData->gtestModel_->updateOverviewDocument(latestTestResult.dom_);
+        }
         testData->gtestModel_->addTestResultFront(latestTestResult.dom_);
 
         testData->gtestModel_->updateModel();
@@ -161,7 +181,7 @@ QStringList TestsController::testResultFiles(const QString& basicPath, QDir::Sor
 }
 
 bool TestsController::addTestResultData(const QString& path, const QString& testResultFile,
-                                        const TestDataPtr& testData)
+                                        const TestDataPtr& testData, const bool isOverview)
 {
     const QString pathToTestXml = xmlPath(path) + "/" + testResultFile;
 
@@ -171,14 +191,31 @@ bool TestsController::addTestResultData(const QString& path, const QString& test
         return false;
     }
 
+    const auto lastModified = QFileInfo(pathToTestXml).lastModified();
+    if (isOverview &&
+        !testData->testOverview_.lastModified_.isNull() &&
+        testData->testOverview_.lastModified_ >= lastModified)
+    {
+        // nothing to update
+        return false;
+    }
+
     QDomDocument doc(path);
     if (loadTestResultXml(pathToTestXml, doc))
     {
         TestResultData resultData;
         resultData.testResultFile_ = pathToTestXml;
+        resultData.lastModified_ = lastModified;
         resultData.dom_ = doc;
-        testData->testResults_.emplace_back(resultData);
-        removeOldTests(testData);
+        if (isOverview)
+        {
+            testData->testOverview_ = resultData;
+        }
+        else
+        {
+            testData->testResults_.emplace_back(resultData);
+            removeOldTests(testData);
+        }
         return true;
     }
     return false;
