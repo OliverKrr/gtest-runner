@@ -65,12 +65,12 @@ void TestsController::addTest(const QString& path)
 
     if (!testData->testOverview_.lastModified_.isNull())
     {
-        testData->gtestModel_->updateOverviewDocument(testData->testOverview_.dom_);
+        testData->gtestModel_->updateOverviewDocument(testData->testOverview_.dom_, true);
     }
     else if (!testData->testResults_.empty())
     {
         // No overview -> use latest as fallback
-        testData->gtestModel_->updateOverviewDocument(testData->testResults_.back().dom_);
+        testData->gtestModel_->updateOverviewDocument(testData->testResults_.back().dom_, false);
     }
 
     // Add TestResults to GtestModel
@@ -103,15 +103,13 @@ bool TestsController::loadLatestTestResult(const QString& path, int& numberError
 
     // Check for new executed test
     auto currentResultFiles = testResultFiles(xmlPath(path), QDir::Time);
-    bool hasOverview = false;
     for (auto resultIter = currentResultFiles.begin(); resultIter != currentResultFiles.end(); ++resultIter)
     {
         if (resultIter->endsWith(GTEST_LIST_NAME))
         {
-            hasOverview = true;
             if (addTestResultData(path, *resultIter, testData, true))
             {
-                testData->gtestModel_->updateOverviewDocument(testData->testOverview_.dom_);
+                testData->gtestModel_->updateOverviewDocument(testData->testOverview_.dom_, true);
                 testData->gtestModel_->updateModel();
             }
             currentResultFiles.erase(resultIter);
@@ -134,10 +132,10 @@ bool TestsController::loadLatestTestResult(const QString& path, int& numberError
         }
 
         const auto& latestTestResult = testData->testResults_.back();
-        if (!hasOverview)
+        if (testData->testOverview_.lastModified_.isNull())
         {
             // if we don't have overview xml -> use latest
-            testData->gtestModel_->updateOverviewDocument(latestTestResult.dom_);
+            testData->gtestModel_->updateOverviewDocument(latestTestResult.dom_, false);
         }
         testData->gtestModel_->addTestResultFront(latestTestResult.dom_);
 

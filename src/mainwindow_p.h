@@ -145,6 +145,7 @@ public:
     QAction* revealExplorerTestResultAction_;
     QAction* runFailedTestAction; ///< Manually forces a test-run for only failed tests
     QAction* runTestAction; ///< Manually forces a test-run.
+    QAction* updateTestListAction; ///< Manually forces an update test list
     QAction* removeTestAction; ///< Removes a test from being watched.
     // Remove all tests
     QAction* removeAllTestsAction_;
@@ -167,6 +168,7 @@ public:
     QAction* killAllTestsAction_; ///< program options.
     QAction* runAllFailedTestsAction; ///< Run all failed tests in the list.
     QAction* runAllTestsAction; ///< Run all tests in the list.
+    QAction* updateAllTestsListAction; ///< Manually forces an update test list of all tests
 
     QMenu* testCaseViewContextMenu; ///< Context menu for the test case tree view
     // Action to set gtest filter and run only the specific test

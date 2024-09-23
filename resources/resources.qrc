@@ -11,6 +11,7 @@
         <file alias="images/hamburger">images/hamburger.png</file>
         <file alias="images/runTest">images/9110954_refresh_cw_reload_icon-00449F.png</file>
         <file alias="images/runFailedTests">images/9110954_refresh_cw_reload_icon-DC3545.png</file>
+        <file alias="images/updateTestList">images/2124265_exchange_document_app_essential_icon-FFB258.png</file>
         <file alias="schemas/gtest.xsd">schemas/gtest.xsd</file>
         <file alias="fonts/consolas">fonts/consola.ttf</file>
     </qresource>

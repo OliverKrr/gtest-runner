@@ -70,7 +70,7 @@ public:
     explicit GTestModel(QObject* parent = 0);
 
     void updateModel();
-    void updateOverviewDocument(QDomDocument overviewDocument);
+    void updateOverviewDocument(QDomDocument overviewDocument, bool isRealOverview);
     void addTestResultFront(QDomDocument document);
     void removeTestResultBack();
     FlatDomeItemPtr itemForIndex(const QModelIndex& index) const;
@@ -109,6 +109,7 @@ private:
 
 
     ModelPtr overviewModel_;
+    bool isRealOverview_;
     std::deque<ModelPtr> testResults_;
 
     QIcon grayIcon;

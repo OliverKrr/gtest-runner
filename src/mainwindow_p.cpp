@@ -1368,6 +1368,8 @@ void MainWindowPrivate::createToolBar()
     runAllTestsAction->setShortcut(QKeySequence(Qt::Key_F6));
     killAllTestsAction_ = new QAction(q->style()->standardIcon(QStyle::SP_BrowserStop), "Kill All Tests", toolBar_);
     killAllTestsAction_->setShortcuts({QKeySequence(Qt::SHIFT + Qt::Key_F6), QKeySequence(Qt::SHIFT + Qt::Key_F4)});
+    updateAllTestsListAction = new QAction(QIcon(":images/updateTestList"), "Update All Tests List", toolBar_);
+    updateAllTestsListAction->setShortcut(QKeySequence(Qt::Key_F8));
     revealExplorerTestResultAction_ = new QAction(q->style()->standardIcon(QStyle::SP_DirOpenIcon),
                                                   "Reveal Test Result Dir", toolBar_);
     removeAllTestsAction_ = new QAction(q->style()->standardIcon(QStyle::SP_TrashIcon), "Remove All Tests", toolBar_);
@@ -1381,6 +1383,7 @@ void MainWindowPrivate::createToolBar()
     toolBar_->addAction(runAllFailedTestsAction);
     toolBar_->addAction(runAllTestsAction);
     toolBar_->addAction(killAllTestsAction_);
+    toolBar_->addAction(updateAllTestsListAction);
     toolBar_->addAction(revealExplorerTestResultAction_);
     toolBar_->addAction(removeAllTestsAction_);
 
@@ -1478,6 +1481,15 @@ void MainWindowPrivate::createToolBar()
     connect(killAllTestsAction_, &QAction::triggered, [this]
     {
         killAllTest();
+    });
+
+    connect(updateAllTestsListAction, &QAction::triggered, [this]
+    {
+        for (int i = 0; i < executableTreeView->model()->rowCount(); ++i)
+        {
+            QModelIndex index = executableTreeView->model()->index(i, 0);
+            runTestInThread(index.data(QExecutableModel::PathRole).toString(), {}, false, true);
+        }
     });
 
     connect(revealExplorerTestResultAction_, &QAction::triggered, [this]
@@ -1587,13 +1599,14 @@ void MainWindowPrivate::createExecutableContextMenu()
     executableContextMenu = new QMenu(executableTreeView);
     executableContextMenu->setToolTipsVisible(true);
 
-    // TODO: add update tests action
     runFailedTestAction = new QAction(QIcon(":images/runFailedTests"), "Run Failed Tests", executableTreeView);
     runFailedTestAction->setShortcut(QKeySequence(Qt::Key_F3));
     runTestAction = new QAction(QIcon(":images/runTest"), "Run Test", executableTreeView);
     runTestAction->setShortcut(QKeySequence(Qt::Key_F5));
     killTestAction = new QAction(q->style()->standardIcon(QStyle::SP_BrowserStop), "Kill Test", executableTreeView);
     killTestAction->setShortcuts({QKeySequence(Qt::SHIFT + Qt::Key_F5), QKeySequence(Qt::SHIFT + Qt::Key_F3)});
+    updateTestListAction = new QAction(QIcon(":images/updateTestList"), "Update Test List", executableTreeView);
+    updateTestListAction->setShortcut(QKeySequence(Qt::Key_F7));
     revealExplorerTestAction_ = new QAction(q->style()->standardIcon(QStyle::SP_DirOpenIcon), "Reveal Test Results",
                                             executableTreeView);
 
@@ -1603,10 +1616,12 @@ void MainWindowPrivate::createExecutableContextMenu()
     executableTreeView->addAction(runFailedTestAction);
     executableTreeView->addAction(runTestAction);
     executableTreeView->addAction(killTestAction);
+    executableTreeView->addAction(updateTestListAction);
 
     executableContextMenu->addAction(runFailedTestAction);
     executableContextMenu->addAction(runTestAction);
     executableContextMenu->addAction(killTestAction);
+    executableContextMenu->addAction(updateTestListAction);
     executableContextMenu->addAction(revealExplorerTestAction_);
     executableContextMenu->addSeparator();
     executableContextMenu->addAction(removeTestAction);
@@ -1632,6 +1647,7 @@ void MainWindowPrivate::createExecutableContextMenu()
             runFailedTestAction->setEnabled(anyTestFailed);
             runTestAction->setEnabled(true);
             killTestAction->setEnabled(isTestRunning);
+            updateTestListAction->setEnabled(!isTestRunning);
             revealExplorerTestAction_->setEnabled(
                 QDir(xmlPath(index.data(QExecutableModel::PathRole).toString())).exists());
             removeTestAction->setEnabled(!isTestRunning);
@@ -1641,6 +1657,7 @@ void MainWindowPrivate::createExecutableContextMenu()
             runFailedTestAction->setEnabled(false);
             runTestAction->setEnabled(false);
             killTestAction->setEnabled(false);
+            updateTestListAction->setEnabled(false);
             revealExplorerTestAction_->setEnabled(false);
             removeTestAction->setEnabled(false);
         }
@@ -1685,6 +1702,13 @@ void MainWindowPrivate::createExecutableContextMenu()
         if (QMessageBox::question(q, "Kill Test?", "Are you sure you want to kill test: " + name + "?",
                                   QMessageBox::Yes, QMessageBox::No) == QMessageBox::Yes)
             emitKillTest(path);
+    });
+
+    connect(updateTestListAction, &QAction::triggered, [this]
+    {
+        const QModelIndex index = executableTreeView->currentIndex();
+        const QString path = index.data(QExecutableModel::PathRole).toString();
+        runTestInThread(path, {}, false, true);
     });
 
     connect(revealExplorerTestAction_, &QAction::triggered, [this]
@@ -1923,6 +1947,7 @@ void MainWindowPrivate::createTestMenu()
     testMenu->addAction(runAllFailedTestsAction);
     testMenu->addAction(runAllTestsAction);
     testMenu->addAction(killAllTestsAction_);
+    testMenu->addAction(updateAllTestsListAction);
     testMenu->addAction(revealExplorerTestResultAction_);
     testMenu->addAction(removeAllTestsAction_);
 

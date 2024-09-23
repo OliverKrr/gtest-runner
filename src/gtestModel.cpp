@@ -4,7 +4,8 @@
 #include <QtXml>
 
 GTestModel::GTestModel(QObject* parent)
-    : QAbstractTableModel(parent), grayIcon(":/images/gray"), greenIcon(":/images/green"),
+    : QAbstractTableModel(parent), isRealOverview_(false),
+      grayIcon(":/images/gray"), greenIcon(":/images/green"),
       yellowIcon(":/images/yellow"), redIcon(":/images/red")
 {
 }
@@ -16,8 +17,9 @@ void GTestModel::updateModel()
     emit dataChanged(topLeft, bottomRight);
 }
 
-void GTestModel::updateOverviewDocument(QDomDocument overviewDocument)
+void GTestModel::updateOverviewDocument(QDomDocument overviewDocument, const bool isRealOverview)
 {
+    isRealOverview_ = isRealOverview;
     overviewModel_ = initModel(overviewDocument, overviewDocument);
     for (ModelPtr& testResult : testResults_)
     {
@@ -157,7 +159,11 @@ QVariant GTestModel::headerData(const int section, const Qt::Orientation orienta
         case TestNumber:
             return tr("Test #");
         case Name:
-            return tr("Name");
+            if (isRealOverview_)
+            {
+                return tr("Name");
+            }
+            return tr("Name (*)");
         case ResultAndTime:
         {
             return timestampForColumn(section);
