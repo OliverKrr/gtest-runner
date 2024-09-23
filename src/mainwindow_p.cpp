@@ -999,11 +999,12 @@ bool MainWindowPrivate::loadTestResults(const QString& testPath, const bool noti
 //--------------------------------------------------------------------------------------------------
 void MainWindowPrivate::selectTest(const QString& testPath) const
 {
-    QModelIndex index = testCaseTableView->selectionModel()->currentIndex();
-    QString currentSelectedTestName;
-    if (index.isValid())
+    const auto indices = testCaseTableView->selectionModel()->selectedRows(GTestModel::Sections::Name);
+    QStringList currentSelectedTestNames;
+    currentSelectedTestNames.reserve(indices.size());
+    for (const auto& index : indices)
     {
-        currentSelectedTestName = index.data(GTestModel::Name).toString();
+        currentSelectedTestNames.append(index.data(Qt::DisplayRole).toString());
     }
 
     // Delete the old failure models and make new ones
@@ -1024,27 +1025,26 @@ void MainWindowPrivate::selectTest(const QString& testPath) const
         testCaseTableView->resizeColumnToContents(i);
     }
 
-    index = QModelIndex();
+    QItemSelection selection;
     // reset the test case selection
-    if (!currentSelectedTestName.isEmpty())
+    if (!currentSelectedTestNames.isEmpty())
     {
-        index = testCaseTableView->model()->index(0, 0);
-        QModelIndexList matches = testCaseTableView->model()->
-                match(index, GTestModel::Name, currentSelectedTestName, 1);
-        if (!matches.empty())
+        for (const auto& currentSelectedTestName : currentSelectedTestNames)
         {
-            index = matches.first();
-        }
-        else
-        {
-            index = QModelIndex();
+            auto index = testCaseTableView->model()->index(0, GTestModel::Name);
+            QModelIndexList matches = testCaseTableView->model()->
+                    match(index, Qt::DisplayRole, currentSelectedTestName, 1);
+            if (!matches.empty())
+            {
+                selection.append(QItemSelectionRange(matches.first()));
+                break;
+            }
         }
     }
 
-    if (index.isValid())
+    if (!selection.isEmpty())
     {
-        testCaseTableView->selectionModel()->setCurrentIndex(
-            index, QItemSelectionModel::Select | QItemSelectionModel::Rows);
+        testCaseTableView->selectionModel()->select(selection, QItemSelectionModel::Select | QItemSelectionModel::Rows);
     }
 }
 
