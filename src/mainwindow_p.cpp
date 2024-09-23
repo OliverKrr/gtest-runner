@@ -69,6 +69,7 @@ MainWindowPrivate::MainWindowPrivate(const QStringList&, const bool reset, MainW
     fileWatcher(new QFileSystemWatcher(q)),
     centralFrame(new QFrame(q)),
     testCaseFilterEdit(new QLineEdit(q)),
+    testCaseFilterNotExecuted(new QCheckBox(q)),
     testCaseFilterPassed(new QCheckBox(q)),
     testCaseFilterIgnored(new QCheckBox(q)),
     testCaseTableView(new QTableView(q)),
@@ -106,6 +107,7 @@ MainWindowPrivate::MainWindowPrivate(const QStringList&, const bool reset, MainW
     auto* filterWidget = new QWidget(centralFrame);
     filterWidget->setLayout(new QHBoxLayout);
     filterWidget->layout()->addWidget(testCaseFilterEdit);
+    filterWidget->layout()->addWidget(testCaseFilterNotExecuted);
     filterWidget->layout()->addWidget(testCaseFilterPassed);
     filterWidget->layout()->addWidget(testCaseFilterIgnored);
     centralFrame->layout()->addWidget(filterWidget);
@@ -143,6 +145,8 @@ MainWindowPrivate::MainWindowPrivate(const QStringList&, const bool reset, MainW
     testCaseFilterEdit->setPlaceholderText("Filter Test Output...");
     testCaseFilterEdit->setClearButtonEnabled(true);
 
+    testCaseFilterNotExecuted->setChecked(true);
+    testCaseFilterNotExecuted->setText("Show Not Executed");
     testCaseFilterPassed->setChecked(true);
     testCaseFilterPassed->setText("Show Passed");
     testCaseFilterIgnored->setChecked(true);
@@ -161,6 +165,7 @@ MainWindowPrivate::MainWindowPrivate(const QStringList&, const bool reset, MainW
 
     testCaseProxyModel->setFilterCaseSensitivity(Qt::CaseInsensitive);
     testCaseProxyModel->setFilterKeyColumn(-1);
+    testCaseProxyModel->setShowNotExecuted(testCaseFilterNotExecuted->isChecked());
     testCaseProxyModel->setShowPassed(testCaseFilterPassed->isChecked());
     testCaseProxyModel->setShowIgnored(testCaseFilterIgnored->isChecked());
 
@@ -256,11 +261,8 @@ MainWindowPrivate::MainWindowPrivate(const QStringList&, const bool reset, MainW
         }
     });
 
-    // TODO: somehow mark (gray) the column when tests were executed with an active filter?
     // TODO: support following options
     //  --gtest_break_on_failure
-    // TODO: filter success doesn't work with overview
-    // TODO: when filtering ignored/passed -> when all children filtered -> we also need to filter parent
     // TODO: check that we not changed failed/success based on overview
     // TODO: we should not log overview in console from test exe
     //  Also test with test pip
@@ -367,6 +369,18 @@ MainWindowPrivate::MainWindowPrivate(const QStringList&, const bool reset, MainW
                 {
                     testCaseTableView->resizeColumnToContents(i);
                 }
+            }
+        }
+    });
+
+    connect(testCaseFilterNotExecuted, &QCheckBox::toggled, this, [this](const bool checked)
+    {
+        testCaseProxyModel->setShowNotExecuted(checked);
+        if (testCaseProxyModel->rowCount())
+        {
+            for (int i = 0; i < testCaseProxyModel->columnCount(); ++i)
+            {
+                testCaseTableView->resizeColumnToContents(i);
             }
         }
     });
@@ -1065,6 +1079,7 @@ void MainWindowPrivate::saveCommonSettings(const QString& path) const
     options.insert("notifyOnSuccess", notifyOnSuccessAction->isChecked());
     options.insert("theme", themeActionGroup->checkedAction()->objectName());
     options.insert("currentRunEnvPath", currentRunEnvPath_);
+    options.insert("testCaseFilterNotExecuted", testCaseFilterNotExecuted->isChecked());
     options.insert("testCaseFilterPassed", testCaseFilterPassed->isChecked());
     options.insert("testCaseFilterIgnored", testCaseFilterIgnored->isChecked());
     root.insert("options", options);
@@ -1190,6 +1205,7 @@ void MainWindowPrivate::loadCommonSettings(const QString& path)
     themeMenu->findChild<QAction *>(options["theme"].toString())->trigger();
     currentRunEnvPath_ = options["currentRunEnvPath"].toString();
     removeRunEnvAction_->setEnabled(!currentRunEnvPath_.isEmpty());
+    testCaseFilterNotExecuted->setChecked(options["testCaseFilterNotExecuted"].toBool());
     testCaseFilterPassed->setChecked(options["testCaseFilterPassed"].toBool());
     testCaseFilterIgnored->setChecked(options["testCaseFilterIgnored"].toBool());
 }
@@ -1606,7 +1622,7 @@ void MainWindowPrivate::createExecutableContextMenu()
             if (testCaseProxyModel->sourceModel())
             {
                 const auto failureData = testCaseProxyModel->sourceModel()->data(
-                    testCaseProxyModel->sourceModel()->index(0, GTestModel::Name),
+                    testCaseProxyModel->sourceModel()->index(0, GTestModel::ResultAndTime),
                     GTestModel::FailureRole);
                 if (failureData.isValid())
                 {
@@ -1715,7 +1731,7 @@ QString MainWindowPrivate::testFilterForAllFailedTests(const QString& testPath) 
     const auto testModel = testsController_->gTestModel(testPath);
     for (int i = 0; i < testModel->rowCount(); ++i)
     {
-        const auto testCaseSourceIndex = testModel->index(i, GTestModel::Name);
+        const auto testCaseSourceIndex = testModel->index(i, GTestModel::ResultAndTime);
         const FlatDomeItemPtr item = testModel->itemForIndex(testCaseSourceIndex);
         // Only check TestCases
         if (item &&

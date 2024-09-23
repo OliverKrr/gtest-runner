@@ -114,6 +114,7 @@ public:
 
     QFrame* centralFrame; ///< Central widget frame.
     QLineEdit* testCaseFilterEdit; ///< Line edit for filtering test cases.
+    QCheckBox* testCaseFilterNotExecuted;
     QCheckBox* testCaseFilterPassed;
     QCheckBox* testCaseFilterIgnored;
     QTableView* testCaseTableView; ///< Table view where the overall test overview is displayed.

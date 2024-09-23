@@ -23,21 +23,22 @@ bool GTestModelSortFilterProxy::filterAcceptsRow(const int sourceRow, const QMod
 bool GTestModelSortFilterProxy::filterAcceptsDescendant(const int sourceRow) const
 {
     // This function is inclusive of the original row queried in addition to all its descendants.
-    const QModelIndex rowToTest = sourceModel()->index(sourceRow, GTestModel::Name);
-
-    const FlatDomeItemPtr item = static_cast<GTestModel *>(sourceModel())->itemForIndex(rowToTest);
+    const QModelIndex nameRowToTest = sourceModel()->index(sourceRow, GTestModel::Name);
+    const FlatDomeItemPtr nameItem = static_cast<GTestModel *>(sourceModel())->itemForIndex(nameRowToTest);
 
     // do bottom to top filtering
-    if (item)
+    if (nameItem)
     {
-        if (!checkShowItem(rowToTest, item))
+        const QModelIndex resultRowToTest = sourceModel()->index(sourceRow, GTestModel::ResultAndTime);
+        const FlatDomeItemPtr resultItem = static_cast<GTestModel *>(sourceModel())->itemForIndex(resultRowToTest);
+        if (!checkShowItem(resultItem, resultRowToTest, nameItem->level()))
         {
             return false;
         }
 
-        if (item->level() < 2)
+        if (nameItem->level() < 2)
         {
-            for (const int childIndex : item->childrenIndex())
+            for (const int childIndex : nameItem->childrenIndex())
             {
                 // if the filter accepts the child
                 if (filterAcceptsDescendant(childIndex))
@@ -48,7 +49,7 @@ bool GTestModelSortFilterProxy::filterAcceptsDescendant(const int sourceRow) con
         }
     }
 
-    return sourceModel()->data(rowToTest).toString().contains(filterRegExp());
+    return sourceModel()->data(nameRowToTest).toString().contains(filterRegExp());
 }
 
 // --------------------------------------------------------------------------------
@@ -56,44 +57,52 @@ bool GTestModelSortFilterProxy::filterAcceptsDescendant(const int sourceRow) con
 // --------------------------------------------------------------------------------
 bool GTestModelSortFilterProxy::filterAcceptsAncestor(const int sourceRow) const
 {
-    const QModelIndex rowToTest = sourceModel()->index(sourceRow, GTestModel::Name);
-
-    const FlatDomeItemPtr item = static_cast<GTestModel *>(sourceModel())->itemForIndex(rowToTest);
+    const QModelIndex nameRowToTest = sourceModel()->index(sourceRow, GTestModel::Name);
+    const FlatDomeItemPtr nameItem = static_cast<GTestModel *>(sourceModel())->itemForIndex(nameRowToTest);
 
     // do bottom to top filtering
-    if (item)
+    if (nameItem)
     {
-        if (!checkShowItem(rowToTest, item))
+        const QModelIndex resultRowToTest = sourceModel()->index(sourceRow, GTestModel::ResultAndTime);
+        const FlatDomeItemPtr resultItem = static_cast<GTestModel *>(sourceModel())->itemForIndex(resultRowToTest);
+        if (!checkShowItem(resultItem, resultRowToTest, nameItem->level()))
         {
             return false;
         }
 
         // if the filter accepts the parent
-        if (item->level() > 0 &&
-            filterAcceptsAncestor(item->parentIndex()))
+        if (nameItem->level() > 0 &&
+            filterAcceptsAncestor(nameItem->parentIndex()))
         {
             return true;
         }
     }
 
-    return sourceModel()->data(rowToTest).toString().contains(filterRegExp());
+    return sourceModel()->data(nameRowToTest).toString().contains(filterRegExp());
 }
 
-bool GTestModelSortFilterProxy::checkShowItem(const QModelIndex& rowToTest, const FlatDomeItemPtr& item) const
+bool GTestModelSortFilterProxy::checkShowItem(const FlatDomeItemPtr& resultItem, const QModelIndex& resultRowToTest,
+                                              const int level) const
 {
     // Always show "All Test" even when nothing failed/ignored
-    if (item->level() == 0)
+    if (level == 0)
     {
         return true;
     }
     // Nothing to filter?
-    if (showPassed_ &&
+    if (showNotExecuted_ &&
+        showPassed_ &&
         showIgnored_)
     {
         return true;
     }
 
-    const bool isIgnored = sourceModel()->data(rowToTest, GTestModel::IgnoredRole).toBool();
+    if (!resultItem)
+    {
+        return showNotExecuted_;
+    }
+
+    const bool isIgnored = sourceModel()->data(resultRowToTest, GTestModel::IgnoredRole).toBool();
     if (isIgnored &&
         !showIgnored_)
     {
@@ -102,7 +111,7 @@ bool GTestModelSortFilterProxy::checkShowItem(const QModelIndex& rowToTest, cons
 
     if (!isIgnored)
     {
-        const bool isPassed = sourceModel()->data(rowToTest, GTestModel::FailureRole).toInt() == 0;
+        const bool isPassed = sourceModel()->data(resultRowToTest, GTestModel::FailureRole).toInt() == 0;
         if (isPassed &&
             !showPassed_)
         {

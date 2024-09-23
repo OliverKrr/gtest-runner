@@ -58,6 +58,12 @@ class GTestModelSortFilterProxy : public QSortFilterProxyModel
 public:
 	explicit GTestModelSortFilterProxy(QObject* parent = nullptr);
 
+	void setShowNotExecuted(const bool value)
+	{
+		showNotExecuted_ = value;
+		invalidateFilter();
+	}
+
 	void setShowPassed(const bool value)
 	{
 		showPassed_ = value;
@@ -74,11 +80,12 @@ protected:
 	bool filterAcceptsRow(int sourceRow, const QModelIndex& sourceParent) const override;
 	bool filterAcceptsDescendant(int sourceRow) const;
 
-	bool checkShowItem(const QModelIndex& rowToTest, const FlatDomeItemPtr& item) const;
+	bool checkShowItem(const FlatDomeItemPtr& resultItem, const QModelIndex& resultRowToTest, int level) const;
 
 	bool filterAcceptsAncestor(int sourceRow) const;
 
 private:
+	bool showNotExecuted_ = true;
 	bool showPassed_ = true;
 	bool showIgnored_ = true;
 };
