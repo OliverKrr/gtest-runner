@@ -57,7 +57,6 @@
 
 #include <QDateTime>
 #include <QDialog>
-#include <QFileDialog>
 #include <QFileSystemWatcher>
 #include <QFrame>
 #include <QLayout>
@@ -224,7 +223,13 @@ public:
                            Qt::CheckState shuffle = Qt::Unchecked,
                            int randomSeed = 0, const QString& otherArgs = "");
 
-    void runTestInThread(const QString& pathToTest, const QString& tempTestFilter, bool notify, bool listTests);
+    enum RunMode
+    {
+        RunTests = 1,
+        ListTests = 2,
+        ListAndRunTests = 3,
+    };
+    void runTestInThread(const QString& pathToTest, const QString& tempTestFilter, bool notify, RunMode runMode);
 
     bool loadTestResults(const QString& testPath, bool notify);
 

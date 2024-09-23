@@ -23,6 +23,7 @@
 #include <QStatusBar>
 #include <QMessageBox>
 #include <QListWidget>
+#include <QFileDialog>
 #include <thread>
 
 #ifndef Q_OS_WIN32
@@ -289,35 +290,28 @@ MainWindowPrivate::MainWindowPrivate(const QStringList&, const bool reset, MainW
             auto currentTime = QDateTime::currentDateTime();
             latestBuildChangeTime_[path] = currentTime;
 
+            // TODO: add global option for auto update tests
+            RunMode runMode = ListTests;
             // only auto-run if the test is checked
             if (m.data(QExecutableModel::AutorunRole).toBool())
             {
-                // add a little delay to avoid running multiple instances of the same test build,
-                // and to avoid running the file before visual studio is done writing it.
-                QTimer::singleShot(2000, [this, path, currentTime]
-                {
-                    // Only run after latest update after timeout and not by previous triggers
-                    if (currentTime == latestBuildChangeTime_[path])
-                    {
-                        emit runTestInThread(path, {}, true, false);
-                    }
-                });
+                runMode = ListAndRunTests;
             }
             else
             {
                 executableModel->setData(m, ExecutableData::NOT_RUNNING, QExecutableModel::StateRole);
-                // TODO: add global option for auto update tests
-                // add a little delay to avoid running multiple instances of the same test build,
-                // and to avoid running the file before visual studio is done writing it.
-                QTimer::singleShot(2000, [this, path, currentTime]
-                {
-                    // Only run after latest update after timeout and not by previous triggers
-                    if (currentTime == latestBuildChangeTime_[path])
-                    {
-                        emit runTestInThread(path, {}, false, true);
-                    }
-                });
             }
+
+            // add a little delay to avoid running multiple instances of the same test build,
+            // and to avoid running the file before visual studio is done writing it.
+            QTimer::singleShot(2000, [this, path, currentTime, runMode]
+            {
+                // Only run after latest update after timeout and not by previous triggers
+                if (currentTime == latestBuildChangeTime_[path])
+                {
+                    emit runTestInThread(path, {}, false, runMode);
+                }
+            });
         }
     });
 
@@ -349,7 +343,7 @@ MainWindowPrivate::MainWindowPrivate(const QStringList&, const bool reset, MainW
                         emit showMessage(
                             "Automatic testing enabled for: " + topLeft.data(Qt::DisplayRole).toString() +
                             ". Re-running tests...");
-                        runTestInThread(topLeft.data(QExecutableModel::PathRole).toString(), {}, true, false);
+                        runTestInThread(topLeft.data(QExecutableModel::PathRole).toString(), {}, true, RunTests);
                     }
                 }
 
@@ -634,16 +628,20 @@ void MainWindowPrivate::addTestExecutable(const QString& path, const QString& na
     latestBuildChangeTime_[path] = lastModified;
 
     // only run if test has run before and is out of date now
-    if (outOfDate && previousResults && autorun)
+    if (outOfDate)
     {
-        this->runTestInThread(path, {}, false, false);
-    }
-    else if (outOfDate)
-    {
-        executableModel->setData(newRow, ExecutableData::NOT_RUNNING, QExecutableModel::StateRole);
         // TODO: add global option for auto update tests
-        // get the list of tests
-        this->runTestInThread(path, {}, false, true);
+        RunMode runMode = ListTests;
+        if (previousResults && autorun)
+        {
+            runMode = ListAndRunTests;
+        }
+        else
+        {
+            executableModel->setData(newRow, ExecutableData::NOT_RUNNING, QExecutableModel::StateRole);
+        }
+
+        this->runTestInThread(path, {}, false, runMode);
     }
 }
 
@@ -651,9 +649,9 @@ void MainWindowPrivate::addTestExecutable(const QString& path, const QString& na
 //	FUNCTION: runTestInThread
 //--------------------------------------------------------------------------------------------------
 void MainWindowPrivate::runTestInThread(const QString& pathToTest, const QString& tempTestFilter, const bool notify,
-                                        const bool listTests)
+                                        const RunMode runMode)
 {
-    std::thread t([this, pathToTest, tempTestFilter, notify, listTests]
+    std::thread t([this, pathToTest, tempTestFilter, notify, runMode]
     {
         QEventLoop loop;
 
@@ -699,6 +697,12 @@ void MainWindowPrivate::runTestInThread(const QString& pathToTest, const QString
             threadKillCv.notify_all();
 
             loop.exit();
+
+            // Now run the test
+            if (runMode == ListAndRunTests)
+            {
+                emit runTestInThread(pathToTest, tempTestFilter, notify, RunTests);
+            }
         };
 
         // when the process finished, read any remaining output then quit the loop
@@ -710,7 +714,7 @@ void MainWindowPrivate::runTestInThread(const QString& pathToTest, const QString
                     // 0 for success and 1 if test have failed -> in both cases a result xml was generated
                     if (exitStatus == QProcess::NormalExit && (exitCode == 0 || exitCode == 1))
                     {
-                        if (!listTests)
+                        if (runMode == RunTests)
                         {
                             output.append(
                                 "\nTEST RUN COMPLETED: " + QDateTime::currentDateTime().toString(
@@ -798,7 +802,7 @@ void MainWindowPrivate::runTestInThread(const QString& pathToTest, const QString
         }
 
         QString gtestFileName;
-        if (listTests)
+        if (runMode != RunTests)
         {
             gtestFileName = outputDir + "/" + GTEST_LIST_NAME;
         }
@@ -810,7 +814,7 @@ void MainWindowPrivate::runTestInThread(const QString& pathToTest, const QString
         arguments << "--gtest_output=xml:\"" + gtestFileName + "\"";
 
         int repeatCount = 1;
-        if (listTests)
+        if (runMode != RunTests)
         {
             arguments << "--gtest_list_tests";
         }
@@ -1464,7 +1468,7 @@ void MainWindowPrivate::createToolBar()
             const QString testFilter = testFilterForAllFailedTests(path);
             if (!testFilter.isEmpty())
             {
-                runTestInThread(path, testFilter, false, false);
+                runTestInThread(path, testFilter, false, RunTests);
             }
         }
     });
@@ -1474,7 +1478,7 @@ void MainWindowPrivate::createToolBar()
         for (int i = 0; i < executableTreeView->model()->rowCount(); ++i)
         {
             QModelIndex index = executableTreeView->model()->index(i, 0);
-            runTestInThread(index.data(QExecutableModel::PathRole).toString(), {}, false, false);
+            runTestInThread(index.data(QExecutableModel::PathRole).toString(), {}, false, RunTests);
         }
     });
 
@@ -1488,7 +1492,7 @@ void MainWindowPrivate::createToolBar()
         for (int i = 0; i < executableTreeView->model()->rowCount(); ++i)
         {
             QModelIndex index = executableTreeView->model()->index(i, 0);
-            runTestInThread(index.data(QExecutableModel::PathRole).toString(), {}, false, true);
+            runTestInThread(index.data(QExecutableModel::PathRole).toString(), {}, false, ListTests);
         }
     });
 
@@ -1683,7 +1687,7 @@ void MainWindowPrivate::createExecutableContextMenu()
         const QString testFilter = testFilterForAllFailedTests(path);
         if (!testFilter.isEmpty())
         {
-            runTestInThread(path, testFilter, false, false);
+            runTestInThread(path, testFilter, false, RunTests);
         }
     });
 
@@ -1691,7 +1695,7 @@ void MainWindowPrivate::createExecutableContextMenu()
     {
         const QModelIndex index = executableTreeView->currentIndex();
         const QString path = index.data(QExecutableModel::PathRole).toString();
-        runTestInThread(path, {}, false, false);
+        runTestInThread(path, {}, false, RunTests);
     });
 
     connect(killTestAction, &QAction::triggered, [this]
@@ -1708,7 +1712,7 @@ void MainWindowPrivate::createExecutableContextMenu()
     {
         const QModelIndex index = executableTreeView->currentIndex();
         const QString path = index.data(QExecutableModel::PathRole).toString();
-        runTestInThread(path, {}, false, true);
+        runTestInThread(path, {}, false, ListTests);
     });
 
     connect(revealExplorerTestAction_, &QAction::triggered, [this]
@@ -1889,7 +1893,7 @@ void MainWindowPrivate::createTestCaseViewContextMenu()
 
         const QModelIndex execIndex = executableTreeView->selectionModel()->currentIndex();
         const QString path = execIndex.data(QExecutableModel::PathRole).toString();
-        runTestInThread(path, testFilter, false, false);
+        runTestInThread(path, testFilter, false, RunTests);
     });
 }
 
