@@ -953,7 +953,8 @@ void MainWindowPrivate::updateButtonsForRunningTests() const
 bool MainWindowPrivate::loadTestResults(const QString& testPath, const bool notify)
 {
     int numberErrors = 0;
-    if (!testsController_->loadLatestTestResult(testPath, numberErrors))
+    bool newTestResult = false;
+    if (!testsController_->loadLatestTestResult(testPath, numberErrors, newTestResult))
     {
         return false;
     }
@@ -974,7 +975,7 @@ bool MainWindowPrivate::loadTestResults(const QString& testPath, const bool noti
         const QString name = executableModel->index(testPath).data(QExecutableModel::NameRole).toString();
         // only show notifications AFTER the initial startup, otherwise the user
         // could get a ton of messages every time they open the program. The messages
-        if (notify && notifyOnFailureAction->isChecked())
+        if (notify && newTestResult && notifyOnFailureAction->isChecked())
         {
             systemTrayIcon->showMessage("Test Failure",
                                         name + " failed with " + QString::number(numberErrors) + " errors.");
@@ -984,7 +985,7 @@ bool MainWindowPrivate::loadTestResults(const QString& testPath, const bool noti
     {
         executableModel->setData(executableModel->index(testPath), ExecutableData::PASSED, QExecutableModel::StateRole);
         const QString name = executableModel->index(testPath).data(QExecutableModel::NameRole).toString();
-        if (notify && notifyOnSuccessAction->isChecked())
+        if (notify && newTestResult && notifyOnSuccessAction->isChecked())
         {
             systemTrayIcon->showMessage("Test Successful", name + " ran with no errors.");
         }

@@ -71,7 +71,7 @@ public:
     * \param numberErrors if latest test results could be loaded, numberErrors will contain the number of failures
     * \return true if there are any previous test results
     */
-    bool loadLatestTestResult(const QString& path, int& numberErrors);
+    bool loadLatestTestResult(const QString& path, int& numberErrors, bool& newTestResult);
 
     /** \brief return GTestModel for given \a path
     *

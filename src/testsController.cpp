@@ -91,9 +91,10 @@ void TestsController::removeTest(const QString& path)
     }
 }
 
-bool TestsController::loadLatestTestResult(const QString& path, int& numberErrors)
+bool TestsController::loadLatestTestResult(const QString& path, int& numberErrors, bool& newTestResult)
 {
     numberErrors = 0;
+    newTestResult = false;
     const auto iter = testsData_.find(path);
     if (iter == testsData_.end())
     {
@@ -131,6 +132,7 @@ bool TestsController::loadLatestTestResult(const QString& path, int& numberError
             return false;
         }
 
+        newTestResult = true;
         const auto& latestTestResult = testData->testResults_.back();
         if (testData->testOverview_.lastModified_.isNull())
         {
@@ -138,7 +140,6 @@ bool TestsController::loadLatestTestResult(const QString& path, int& numberError
             testData->gtestModel_->updateOverviewDocument(latestTestResult.dom_, false);
         }
         testData->gtestModel_->addTestResultFront(latestTestResult.dom_);
-
         testData->gtestModel_->updateModel();
     }
 
