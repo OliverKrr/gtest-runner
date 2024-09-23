@@ -264,7 +264,6 @@ MainWindowPrivate::MainWindowPrivate(const QStringList&, const bool reset, MainW
 
     // TODO: support following options
     //  --gtest_break_on_failure
-    // TODO: check that we not changed failed/success based on overview
     // TODO: we should not log overview in console from test exe
     //  Also test with test pip
 
