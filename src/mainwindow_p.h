@@ -221,8 +221,8 @@ public:
 
     void addTestExecutable(const QString& path, const QString& name, const QString& testDriver, bool autorun,
                            QDateTime lastModified, const QString& filter = "", int repeat = 0,
-                           Qt::CheckState runDisabled = Qt::Unchecked, Qt::CheckState failFast = Qt::Unchecked,
-                           Qt::CheckState shuffle = Qt::Unchecked,
+                           Qt::CheckState runDisabled = Qt::Unchecked, Qt::CheckState breakOnFailure = Qt::Unchecked,
+                           Qt::CheckState failFast = Qt::Unchecked, Qt::CheckState shuffle = Qt::Unchecked,
                            int randomSeed = 0, const QString& otherArgs = "");
 
     enum RunMode
@@ -232,6 +232,7 @@ public:
         ListTests,
         ListAndRunTests
     };
+
     void runTestInThread(const QString& pathToTest, const QString& tempTestFilter, bool notify, RunMode runMode);
 
     bool loadTestResults(const QString& testPath, bool notify);

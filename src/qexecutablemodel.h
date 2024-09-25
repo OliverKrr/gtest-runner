@@ -83,6 +83,7 @@ struct ExecutableData
     QString filter; ///< filter to be applied on gtest command line
     int repeat; ///< Number of times to repeat the test. Can be -1.
     Qt::CheckState runDisabled; ///< gtest command line to run disabled tests
+    Qt::CheckState breakOnFailure; ///< gtest command line to break on failure
     Qt::CheckState failFast; ///< gtest command line to fail fast
     Qt::CheckState shuffle; ///< gtest command line option to shuffle tests
     int randomSeed; ///< Random seed for the shuffle
@@ -125,6 +126,7 @@ public:
         FilterRole,
         RepeatTestsRole,
         RunDisabledTestsRole,
+        BreakOnFailureRole,
         FailFastRole,
         ShuffleRole,
         RandomSeedRole,

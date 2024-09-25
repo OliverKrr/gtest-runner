@@ -262,9 +262,6 @@ MainWindowPrivate::MainWindowPrivate(const QStringList&, const bool reset, MainW
         }
     });
 
-    // TODO: support following options
-    //  --gtest_break_on_failure
-
     // switch testCase models when new tests are clicked
     connect(executableTreeView->selectionModel(), &QItemSelectionModel::selectionChanged,
             [this](const QItemSelection& selected, const QItemSelection& deselected)
@@ -578,6 +575,7 @@ void MainWindowPrivate::addTestExecutable(const QString& path, const QString& na
                                           QDateTime lastModified, const QString& filter /*= ""*/,
                                           const int repeat /*= 0*/,
                                           const Qt::CheckState runDisabled /*= Qt::Unchecked*/,
+                                          const Qt::CheckState breakOnFailure /*= Qt::Unchecked*/,
                                           const Qt::CheckState failFast /*= Qt::Unchecked*/,
                                           const Qt::CheckState shuffle /*= Qt::Unchecked*/,
                                           const int randomSeed /*= 0*/, const QString& otherArgs /*= ""*/)
@@ -611,6 +609,7 @@ void MainWindowPrivate::addTestExecutable(const QString& path, const QString& na
     executableModel->setData(newRow, filter, QExecutableModel::FilterRole);
     executableModel->setData(newRow, repeat, QExecutableModel::RepeatTestsRole);
     executableModel->setData(newRow, runDisabled, QExecutableModel::RunDisabledTestsRole);
+    executableModel->setData(newRow, breakOnFailure, QExecutableModel::BreakOnFailureRole);
     executableModel->setData(newRow, failFast, QExecutableModel::FailFastRole);
     executableModel->setData(newRow, shuffle, QExecutableModel::ShuffleRole);
     executableModel->setData(newRow, randomSeed, QExecutableModel::RandomSeedRole);
@@ -729,7 +728,7 @@ void MainWindowPrivate::runTestInThread(const QString& pathToTest, const QString
         (const int exitCode, const QProcess::ExitStatus exitStatus)
                 {
                     executableModel->setData(executableModel->index(pathToTest), ExecutableData::NOT_RUNNING,
-                         QExecutableModel::StateRole);
+                                             QExecutableModel::StateRole);
 
                     QString output;
                     if (runMode == RunTests)
@@ -884,6 +883,9 @@ void MainWindowPrivate::runTestInThread(const QString& pathToTest, const QString
 
             const int runDisabled = executableModel->data(index, QExecutableModel::RunDisabledTestsRole).toInt();
             if (runDisabled) arguments << "--gtest_also_run_disabled_tests";
+
+            const int breakOnFailure = executableModel->data(index, QExecutableModel::BreakOnFailureRole).toInt();
+            if (breakOnFailure) arguments << "--gtest_break_on_failure";
 
             const int failFast = executableModel->data(index, QExecutableModel::FailFastRole).toInt();
             if (failFast) arguments << "--gtest_fail_fast";
@@ -1177,6 +1179,7 @@ void MainWindowPrivate::saveTestSettings(const QString& path) const
         test.insert("filter", QJsonValue::fromVariant(index.data(QExecutableModel::FilterRole)));
         test.insert("repeat", QJsonValue::fromVariant(index.data(QExecutableModel::RepeatTestsRole)));
         test.insert("runDisabled", QJsonValue::fromVariant(index.data(QExecutableModel::RunDisabledTestsRole)));
+        test.insert("breakOnFailure", QJsonValue::fromVariant(index.data(QExecutableModel::BreakOnFailureRole)));
         test.insert("failFast", QJsonValue::fromVariant(index.data(QExecutableModel::FailFastRole)));
         test.insert("shuffle", QJsonValue::fromVariant(index.data(QExecutableModel::ShuffleRole)));
         test.insert("seed", QJsonValue::fromVariant(index.data(QExecutableModel::RandomSeedRole)));
@@ -1289,13 +1292,14 @@ void MainWindowPrivate::loadTestSettings(const QString& path)
         QString filter = test["filter"].toString();
         const int repeat = test["repeat"].toInt();
         const auto runDisabled = static_cast<Qt::CheckState>(test["runDisabled"].toInt());
+        const auto breakOnFailure = static_cast<Qt::CheckState>(test["breakOnFailure"].toInt());
         const auto failFast = static_cast<Qt::CheckState>(test["failFast"].toInt());
         const auto shuffle = static_cast<Qt::CheckState>(test["shuffle"].toInt());
         const int seed = test["seed"].toInt();
         QString args = test["args"].toString();
 
-        addTestExecutable(pathInner, name, testDriver, autorun, lastModified, filter, repeat, runDisabled, failFast,
-                          shuffle, seed, args);
+        addTestExecutable(pathInner, name, testDriver, autorun, lastModified, filter, repeat, runDisabled,
+                          breakOnFailure, failFast, shuffle, seed, args);
     }
 }
 

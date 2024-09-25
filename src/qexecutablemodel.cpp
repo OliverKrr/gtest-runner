@@ -116,6 +116,8 @@ Q_INVOKABLE QVariant QExecutableModel::data(const QModelIndex& index, const int 
         return itr->repeat;
     case RunDisabledTestsRole:
         return itr->runDisabled;
+    case BreakOnFailureRole:
+        return itr->breakOnFailure;
     case FailFastRole:
         return itr->failFast;
     case ShuffleRole:
@@ -169,6 +171,9 @@ Q_INVOKABLE bool QExecutableModel::setData(const QModelIndex& index, const QVari
         break;
     case RunDisabledTestsRole:
         itr->runDisabled = static_cast<Qt::CheckState>(value.toInt());
+        break;
+    case BreakOnFailureRole:
+        itr->breakOnFailure = static_cast<Qt::CheckState>(value.toInt());
         break;
     case FailFastRole:
         itr->failFast = static_cast<Qt::CheckState>(value.toInt());
@@ -263,6 +268,7 @@ QMimeData* QExecutableModel::mimeData(const QModelIndexList& indexes) const
             QVariant FilterRoleText = data(index, FilterRole);
             QVariant RepeatTestsRoleText = data(index, RepeatTestsRole);
             QVariant RunDisabledTestsRoleText = data(index, RunDisabledTestsRole);
+            QVariant breakOnFailureText = data(index, BreakOnFailureRole);
             QVariant failFastText = data(index, FailFastRole);
             QVariant ShuffleRoleText = data(index, ShuffleRole);
             QVariant RandomSeedRoleText = data(index, RandomSeedRole);
@@ -270,7 +276,7 @@ QMimeData* QExecutableModel::mimeData(const QModelIndexList& indexes) const
             QVariant AutorunRoleText = data(index, AutorunRole);
             stream << PathRoleText << NameRoleText << TestDriverText << StateRoleText << LastModifiedRoleText <<
                     ProgressRoleText << FilterRoleText << RepeatTestsRoleText <<
-                    RunDisabledTestsRoleText << failFastText << ShuffleRoleText << RandomSeedRoleText << ArgsRoleText <<
+                    RunDisabledTestsRoleText << breakOnFailureText << failFastText << ShuffleRoleText << RandomSeedRoleText << ArgsRoleText <<
                     AutorunRoleText;
         }
     }
@@ -310,6 +316,7 @@ bool QExecutableModel::dropMimeData(const QMimeData* data, const Qt::DropAction 
             stream >> itemData[FilterRole];
             stream >> itemData[RepeatTestsRole];
             stream >> itemData[RunDisabledTestsRole];
+            stream >> itemData[BreakOnFailureRole];
             stream >> itemData[FailFastRole];
             stream >> itemData[ShuffleRole];
             stream >> itemData[RandomSeedRole];
@@ -351,6 +358,7 @@ QMap<int, QVariant> QExecutableModel::itemData(const QModelIndex& index) const
     ret[FilterRole] = itr->filter;
     ret[RepeatTestsRole] = itr->repeat;
     ret[RunDisabledTestsRole] = itr->runDisabled;
+    ret[BreakOnFailureRole] = itr->breakOnFailure;
     ret[FailFastRole] = itr->failFast;
     ret[ShuffleRole] = itr->shuffle;
     ret[RandomSeedRole] = itr->randomSeed;
@@ -378,6 +386,7 @@ bool QExecutableModel::setItemData(const QModelIndex& index, const QMap<int, QVa
     itr->filter = roles[FilterRole].toString();
     itr->repeat = roles[RepeatTestsRole].toInt();
     itr->runDisabled = static_cast<Qt::CheckState>(roles[RunDisabledTestsRole].toInt());
+    itr->breakOnFailure = static_cast<Qt::CheckState>(roles[BreakOnFailureRole].toInt());
     itr->failFast = static_cast<Qt::CheckState>(roles[FailFastRole].toInt());
     itr->shuffle = static_cast<Qt::CheckState>(roles[ShuffleRole].toInt());
     itr->randomSeed = roles[RandomSeedRole].toInt();
