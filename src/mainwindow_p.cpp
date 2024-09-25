@@ -155,6 +155,9 @@ MainWindowPrivate::MainWindowPrivate(const QStringList&, const bool reset, MainW
 
     // TODO: disable sorting for now -> need to ensure that "TestAll/Suite" doesn't get mixed up
     // TODO: when sort on success -> toggle between time & failure
+    // TODO: compare code against original -> also auto-format before
+    // TODO: fix auto-update of view when there are new results
+    // TODO: test breakOnFailure -> disable if not working?
     testCaseTableView->setSortingEnabled(false);
     //testCaseTableView->sortByColumn(GTestModel::TestNumber, Qt::AscendingOrder);
     testCaseTableView->setSelectionMode(QAbstractItemView::ExtendedSelection);
