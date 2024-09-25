@@ -231,7 +231,6 @@ bool TestsController::loadTestResultXml(const QString& pathToTestXml, QDomDocume
     QFile file(xmlInfo.absoluteFilePath());
     if (!file.open(QIODevice::ReadOnly))
     {
-        // TODO: emit and show in mainWindow (set right parent)
         QMessageBox::warning(nullptr, "Error", "Could not open file located at: " + xmlInfo.absoluteFilePath());
         return false;
     }
@@ -276,6 +275,16 @@ bool TestsController::autoRun(const QString& path) const
     if (iter != testsData_.end())
     {
         return iter->second->autoRun_;
+    }
+    return false;
+}
+
+bool TestsController::hasOverview(const QString& path) const
+{
+    const auto iter = testsData_.find(path);
+    if (iter != testsData_.end())
+    {
+        return !iter->second->testOverview_.lastModified_.isNull();
     }
     return false;
 }

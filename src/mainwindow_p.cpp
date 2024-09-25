@@ -264,8 +264,6 @@ MainWindowPrivate::MainWindowPrivate(const QStringList&, const bool reset, MainW
 
     // TODO: support following options
     //  --gtest_break_on_failure
-    // TODO: we should not log overview in console from test exe
-    //  Also test with test pip
 
     // switch testCase models when new tests are clicked
     connect(executableTreeView->selectionModel(), &QItemSelectionModel::selectionChanged,
@@ -289,28 +287,34 @@ MainWindowPrivate::MainWindowPrivate(const QStringList&, const bool reset, MainW
             auto currentTime = QDateTime::currentDateTime();
             latestBuildChangeTime_[path] = currentTime;
 
-            // TODO: add global option for auto update tests
-            RunMode runMode = ListTests;
+            RunMode runMode = NoTests;
+            if (autoUpdateTestListAction_->isChecked())
+            {
+                runMode = ListTests;
+            }
             // only auto-run if the test is checked
             if (m.data(QExecutableModel::AutorunRole).toBool())
             {
-                runMode = ListAndRunTests;
+                runMode = runMode == ListTests ? ListAndRunTests : RunTests;
             }
             else
             {
                 executableModel->setData(m, ExecutableData::NOT_RUNNING, QExecutableModel::StateRole);
             }
 
-            // add a little delay to avoid running multiple instances of the same test build,
-            // and to avoid running the file before visual studio is done writing it.
-            QTimer::singleShot(2000, [this, path, currentTime, runMode]
+            if (runMode != NoTests)
             {
-                // Only run after latest update after timeout and not by previous triggers
-                if (currentTime == latestBuildChangeTime_[path])
+                // add a little delay to avoid running multiple instances of the same test build,
+                // and to avoid running the file before visual studio is done writing it.
+                QTimer::singleShot(2000, [this, path, currentTime, runMode]
                 {
-                    emit runTestInThread(path, {}, false, runMode);
-                }
-            });
+                    // Only run after latest update after timeout and not by previous triggers
+                    if (currentTime == latestBuildChangeTime_[path])
+                    {
+                        emit runTestInThread(path, {}, false, runMode);
+                    }
+                });
+            }
         }
     });
 
@@ -476,10 +480,13 @@ MainWindowPrivate::MainWindowPrivate(const QStringList&, const bool reset, MainW
     connect(this, &MainWindowPrivate::testOutputReady, this, [this](const QString& text)
     {
         // add the new test output
-        consoleTextEdit->moveCursor(QTextCursor::End);
-        consoleTextEdit->insertPlainText(text);
-        consoleTextEdit->moveCursor(QTextCursor::End);
-        consoleTextEdit->ensureCursorVisible();
+        if (!text.isEmpty())
+        {
+            consoleTextEdit->moveCursor(QTextCursor::End);
+            consoleTextEdit->insertPlainText(text);
+            consoleTextEdit->moveCursor(QTextCursor::End);
+            consoleTextEdit->ensureCursorVisible();
+        }
     }, Qt::QueuedConnection);
 
     // update test progress
@@ -626,20 +633,32 @@ void MainWindowPrivate::addTestExecutable(const QString& path, const QString& na
     testRunningHash[path] = false;
     latestBuildChangeTime_[path] = lastModified;
 
+    RunMode runMode = NoTests;
+    if (!testsController_->hasOverview(path) &&
+        autoUpdateTestListAction_->isChecked())
+    {
+        runMode = ListTests;
+    }
+
     // only run if test has run before and is out of date now
     if (outOfDate)
     {
-        // TODO: add global option for auto update tests
-        RunMode runMode = ListTests;
+        if (autoUpdateTestListAction_->isChecked())
+        {
+            runMode = ListTests;
+        }
+        // only auto-run if the test is checked
         if (previousResults && autorun)
         {
-            runMode = ListAndRunTests;
+            runMode = runMode == ListTests ? ListAndRunTests : RunTests;
         }
         else
         {
             executableModel->setData(newRow, ExecutableData::NOT_RUNNING, QExecutableModel::StateRole);
         }
-
+    }
+    if (runMode != NoTests)
+    {
         this->runTestInThread(path, {}, false, runMode);
     }
 }
@@ -709,7 +728,15 @@ void MainWindowPrivate::runTestInThread(const QString& pathToTest, const QString
                 [&, pathToTest]
         (const int exitCode, const QProcess::ExitStatus exitStatus)
                 {
-                    QString output = testProcess.readAllStandardOutput();
+                    executableModel->setData(executableModel->index(pathToTest), ExecutableData::NOT_RUNNING,
+                         QExecutableModel::StateRole);
+
+                    QString output;
+                    if (runMode == RunTests)
+                    {
+                        output = testProcess.readAllStandardOutput();
+                    }
+
                     // 0 for success and 1 if test have failed -> in both cases a result xml was generated
                     if (exitStatus == QProcess::NormalExit && (exitCode == 0 || exitCode == 1))
                     {
@@ -724,11 +751,18 @@ void MainWindowPrivate::runTestInThread(const QString& pathToTest, const QString
                     }
                     else
                     {
-                        output.append(
-                            "\nTEST RUN EXITED WITH ERRORS: " + QDateTime::currentDateTime().toString(
-                                "yyyy-MMM-dd hh:mm:ss.zzz") + " " + testName + "\n\n");
-                        executableModel->setData(executableModel->index(pathToTest), ExecutableData::NOT_RUNNING,
-                                                 QExecutableModel::StateRole);
+                        if (runMode == RunTests)
+                        {
+                            output.append(
+                                "\nTEST RUN EXITED WITH ERRORS: " + QDateTime::currentDateTime().toString(
+                                    "yyyy-MMM-dd hh:mm:ss.zzz") + " " + testName + "\n\n");
+                        }
+                        else
+                        {
+                            output.append(
+                                "\nLIST TEST EXITED WITH ERRORS: " + QDateTime::currentDateTime().toString(
+                                    "yyyy-MMM-dd hh:mm:ss.zzz") + " " + testName + "\n\n");
+                        }
                     }
 
                     tearDown(output);
@@ -887,38 +921,41 @@ void MainWindowPrivate::runTestInThread(const QString& pathToTest, const QString
         }
 
         // print test output as it becomes available
-        connect(&testProcess, &QProcess::readyReadStandardOutput, &loop, [&, pathToTest]
+        if (runMode == RunTests)
         {
-            const QString output = testProcess.readAllStandardOutput();
-
-            // parse the first output line for the number of tests so we can
-            // keep track of progress
-            if (first)
+            connect(&testProcess, &QProcess::readyReadStandardOutput, &loop, [&, pathToTest]
             {
-                // get the number of tests
-                static QRegExp rx("([0-9]+) tests");
-                (void) rx.indexIn(output);
-                tests = rx.cap(1).toInt();
-                if (tests)
+                const QString output = testProcess.readAllStandardOutput();
+
+                // parse the first output line for the number of tests so we can
+                // keep track of progress
+                if (first)
                 {
-                    first = false;
-                    tests *= repeatCount;
+                    // get the number of tests
+                    static QRegExp rx("([0-9]+) tests");
+                    (void) rx.indexIn(output);
+                    tests = rx.cap(1).toInt();
+                    if (tests)
+                    {
+                        first = false;
+                        tests *= repeatCount;
+                    }
+                    else
+                    {
+                        tests = 1;
+                    }
                 }
                 else
                 {
-                    tests = 1;
+                    const QRegExp rx(R"((\[.*OK.*\]|\[.*FAILED.*\]))");
+                    if (rx.indexIn(output) != -1)
+                        progress++;
                 }
-            }
-            else
-            {
-                const QRegExp rx(R"((\[.*OK.*\]|\[.*FAILED.*\]))");
-                if (rx.indexIn(output) != -1)
-                    progress++;
-            }
 
-            emit testProgress(pathToTest, progress, tests);
-            emit testOutputReady(output);
-        }, Qt::QueuedConnection);
+                emit testProgress(pathToTest, progress, tests);
+                emit testOutputReady(output);
+            }, Qt::QueuedConnection);
+        }
 
         loop.exec();
     });
@@ -1079,6 +1116,7 @@ void MainWindowPrivate::saveCommonSettings(const QString& path) const
     QJsonObject options;
     options.insert("runTestsSynchronous", runTestsSynchronousAction_->isChecked());
     options.insert("pipeAllTestOutput", pipeAllTestOutput_->isChecked());
+    options.insert("autoUpdateTestListAction", autoUpdateTestListAction_->isChecked());
     options.insert("notifyOnFailure", notifyOnFailureAction->isChecked());
     options.insert("notifyOnSuccess", notifyOnSuccessAction->isChecked());
     options.insert("theme", themeActionGroup->checkedAction()->objectName());
@@ -1204,6 +1242,7 @@ void MainWindowPrivate::loadCommonSettings(const QString& path)
     QJsonObject options = root["options"].toObject();
     runTestsSynchronousAction_->setChecked(options["runTestsSynchronous"].toBool());
     pipeAllTestOutput_->setChecked(options["pipeAllTestOutput"].toBool());
+    autoUpdateTestListAction_->setChecked(options["autoUpdateTestListAction"].toBool());
     notifyOnFailureAction->setChecked(options["notifyOnFailure"].toBool());
     notifyOnSuccessAction->setChecked(options["notifyOnSuccess"].toBool());
     themeMenu->findChild<QAction *>(options["theme"].toString())->trigger();
@@ -1970,6 +2009,7 @@ void MainWindowPrivate::createOptionsMenu()
 
     runTestsSynchronousAction_ = new QAction("Run tests synchronous and not parallel", optionsMenu);
     pipeAllTestOutput_ = new QAction("Pipe all test output to Console Output", optionsMenu);
+    autoUpdateTestListAction_ = new QAction("Auto-Update the Test List after Build", optionsMenu);
     notifyOnFailureAction = new QAction("Notify on auto-run Failure", optionsMenu);
     notifyOnSuccessAction = new QAction("Notify on auto-run Success", optionsMenu);
 
@@ -1978,6 +2018,8 @@ void MainWindowPrivate::createOptionsMenu()
     runTestsSynchronousAction_->setChecked(false);
     pipeAllTestOutput_->setCheckable(true);
     pipeAllTestOutput_->setChecked(false);
+    autoUpdateTestListAction_->setCheckable(true);
+    autoUpdateTestListAction_->setChecked(true);
     notifyOnFailureAction->setCheckable(true);
     notifyOnFailureAction->setChecked(true);
     notifyOnSuccessAction->setCheckable(true);
@@ -1985,6 +2027,7 @@ void MainWindowPrivate::createOptionsMenu()
 
     optionsMenu->addAction(runTestsSynchronousAction_);
     optionsMenu->addAction(pipeAllTestOutput_);
+    optionsMenu->addAction(autoUpdateTestListAction_);
     optionsMenu->addAction(notifyOnFailureAction);
     optionsMenu->addAction(notifyOnSuccessAction);
 

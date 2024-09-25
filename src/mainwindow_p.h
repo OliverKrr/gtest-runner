@@ -154,6 +154,8 @@ public:
     QAction* runTestsSynchronousAction_;
     // Enable to pipe all test output to console
     QAction* pipeAllTestOutput_;
+    // Enable automatic update of the test list
+    QAction* autoUpdateTestListAction_;
     QAction* notifyOnFailureAction; ///< Enable failure notifications
     QAction* notifyOnSuccessAction; ///< Enable success notifications
 
@@ -225,9 +227,10 @@ public:
 
     enum RunMode
     {
-        RunTests = 1,
-        ListTests = 2,
-        ListAndRunTests = 3,
+        NoTests,
+        RunTests,
+        ListTests,
+        ListAndRunTests
     };
     void runTestInThread(const QString& pathToTest, const QString& tempTestFilter, bool notify, RunMode runMode);
 

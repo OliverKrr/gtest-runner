@@ -88,6 +88,8 @@ public:
 
     bool autoRun(const QString& path) const;
 
+    bool hasOverview(const QString& path) const;
+
 private:
     struct TestResultData
     {
