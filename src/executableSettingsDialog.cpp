@@ -102,7 +102,7 @@ QExecutableSettingsDialog::QExecutableSettingsDialog(QWidget* parent /*= (QObjec
 	d->gtestFilterEdit->setPlaceholderText("Use * for wildcard");
 	d->gtestFilterLabel->setToolTip("Sets the gtest_filter command line argument.");
 	d->gtestAlsoRunDisabledTestsCheckbox->setToolTip("sets the gtest_also_run_disabled_tests command line argument.");
-	d->gtestBreakOnFailureCheckbox->setToolTip("Drop application in interactive mode on failure to attach the debugger.");
+	d->gtestBreakOnFailureCheckbox->setToolTip("Drop application into interactive mode on failure when running attached to a debugger.");
 	d->gtestFailFastCheckbox->setToolTip("Sets the gtest_fail_fast command line argument. Test execution will stop of first error.");
 	d->gtestRepeatLineEdit->setToolTip("set the gtest_repeat command line argument. A value of -1 will cause the test to run forever.");
 	d->gtestRepeatLineEdit->setText("1");

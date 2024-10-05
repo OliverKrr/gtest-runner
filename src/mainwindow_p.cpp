@@ -153,8 +153,6 @@ MainWindowPrivate::MainWindowPrivate(const QStringList&, const bool reset, MainW
     testCaseFilterIgnored->setChecked(true);
     testCaseFilterIgnored->setText("Show Ignored");
 
-    // TODO: test breakOnFailure -> disable if not working?
-    // TODO: test default new options when loading from prev version
     testCaseTableView->setSortingEnabled(false);
     testCaseTableView->sortByColumn(GTestModel::TestNumber, Qt::AscendingOrder);
     testCaseTableView->setSelectionMode(QAbstractItemView::ExtendedSelection);
@@ -1244,15 +1242,32 @@ void MainWindowPrivate::loadCommonSettings(const QString& path)
     QJsonObject options = root["options"].toObject();
     runTestsSynchronousAction_->setChecked(options["runTestsSynchronous"].toBool());
     pipeAllTestOutput_->setChecked(options["pipeAllTestOutput"].toBool());
-    autoUpdateTestListAction_->setChecked(options["autoUpdateTestListAction"].toBool());
+    // Added in a later version
+    auto iter = options.find("autoUpdateTestListAction");
+    if (iter != options.end())
+    {
+        autoUpdateTestListAction_->setChecked(iter->toBool());
+    }
     notifyOnFailureAction->setChecked(options["notifyOnFailure"].toBool());
     notifyOnSuccessAction->setChecked(options["notifyOnSuccess"].toBool());
     themeMenu->findChild<QAction *>(options["theme"].toString())->trigger();
     currentRunEnvPath_ = options["currentRunEnvPath"].toString();
     removeRunEnvAction_->setEnabled(!currentRunEnvPath_.isEmpty());
-    testCaseFilterNotExecuted->setChecked(options["testCaseFilterNotExecuted"].toBool());
-    testCaseFilterPassed->setChecked(options["testCaseFilterPassed"].toBool());
-    testCaseFilterIgnored->setChecked(options["testCaseFilterIgnored"].toBool());
+    iter = options.find("testCaseFilterNotExecuted");
+    if (iter != options.end())
+    {
+        testCaseFilterNotExecuted->setChecked(iter->toBool());
+    }
+    iter = options.find("testCaseFilterPassed");
+    if (iter != options.end())
+    {
+        testCaseFilterPassed->setChecked(iter->toBool());
+    }
+    iter = options.find("testCaseFilterIgnored");
+    if (iter != options.end())
+    {
+        testCaseFilterIgnored->setChecked(iter->toBool());
+    }
 }
 
 void MainWindowPrivate::loadTestSettingsForCurrentRunEnv()
