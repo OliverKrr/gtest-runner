@@ -10,15 +10,9 @@ GTestModel::GTestModel(QObject* parent)
 {
 }
 
-void GTestModel::updateModel()
-{
-    const QModelIndex topLeft = index(0, 0);
-    const QModelIndex bottomRight = index(rowCount(), columnCount());
-    emit dataChanged(topLeft, bottomRight);
-}
-
 void GTestModel::updateOverviewDocument(QDomDocument overviewDocument, const bool isRealOverview)
 {
+    emit beginResetModel();
     isRealOverview_ = isRealOverview;
     overviewModel_ = initModel(overviewDocument, overviewDocument);
     for (ModelPtr& testResult : testResults_)
@@ -26,12 +20,15 @@ void GTestModel::updateOverviewDocument(QDomDocument overviewDocument, const boo
         const ModelPtr updatedResult = initModel(testResult->document_, overviewModel_->document_);
         testResult = updatedResult;
     }
+    emit endResetModel();
 }
 
 void GTestModel::addTestResultFront(QDomDocument document)
 {
+    emit beginResetModel();
     const ModelPtr model = initModel(document, overviewModel_ ? overviewModel_->document_ : QDomDocument());
     testResults_.emplace_front(model);
+    emit endResetModel();
 }
 
 void GTestModel::removeTestResultBack()
@@ -40,7 +37,9 @@ void GTestModel::removeTestResultBack()
     {
         return;
     }
+    emit beginResetModel();
     testResults_.pop_back();
+    emit endResetModel();
 }
 
 int GTestModel::columnCount(const QModelIndex& /*parent*/) const
@@ -91,7 +90,6 @@ QVariant GTestModel::data(const QModelIndex& index, const int role) const
                 result += indent(item->level()) + failures + "/" + tests;
                 // fill middle between result and time with spaces
                 const QString timestamp = timestampForColumn(index.column());
-                // TODO: doesn't work like this
                 result += QString(timestamp.size() - result.size() - time.size(), ' ');
             }
             result += time;

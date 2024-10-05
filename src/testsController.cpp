@@ -111,7 +111,6 @@ bool TestsController::loadLatestTestResult(const QString& path, int& numberError
             if (addTestResultData(path, *resultIter, testData, true))
             {
                 testData->gtestModel_->updateOverviewDocument(testData->testOverview_.dom_, true);
-                testData->gtestModel_->updateModel();
             }
             currentResultFiles.erase(resultIter);
             break;
@@ -140,7 +139,6 @@ bool TestsController::loadLatestTestResult(const QString& path, int& numberError
             testData->gtestModel_->updateOverviewDocument(latestTestResult.dom_, false);
         }
         testData->gtestModel_->addTestResultFront(latestTestResult.dom_);
-        testData->gtestModel_->updateModel();
     }
 
     numberErrors = testData->testResults_.back().dom_.elementsByTagName("testsuites").item(0).attributes().

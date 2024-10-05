@@ -67,9 +67,8 @@ public:
         ResultAndTime
     };
 
-    explicit GTestModel(QObject* parent = 0);
+    explicit GTestModel(QObject* parent = nullptr);
 
-    void updateModel();
     void updateOverviewDocument(QDomDocument overviewDocument, bool isRealOverview);
     void addTestResultFront(QDomDocument document);
     void removeTestResultBack();

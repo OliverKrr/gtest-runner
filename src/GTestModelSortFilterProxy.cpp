@@ -121,3 +121,82 @@ bool GTestModelSortFilterProxy::checkShowItem(const FlatDomeItemPtr& resultItem,
 
     return true;
 }
+
+bool GTestModelSortFilterProxy::lessThan(const QModelIndex& left, const QModelIndex& right) const
+{
+    // First check if left or right is the top-level AllTest -> always first
+    const QModelIndex leftName = sourceModel()->index(left.row(), GTestModel::Name);
+    const FlatDomeItemPtr leftNameItem = static_cast<GTestModel *>(sourceModel())->itemForIndex(leftName);
+    if (leftNameItem->level() == 0)
+    {
+        return sortOrder() == Qt::AscendingOrder;
+    }
+
+    const QModelIndex rightName = sourceModel()->index(right.row(), GTestModel::Name);
+    const FlatDomeItemPtr rightNameItem = static_cast<GTestModel *>(sourceModel())->itemForIndex(rightName);
+    if (rightNameItem->level() == 0)
+    {
+        return sortOrder() != Qt::AscendingOrder;
+    }
+
+    // Check if one is the child of the other -> parent (TestSuite) always before child (Test)
+    if (leftNameItem->level() != rightNameItem->level())
+    {
+        if (leftNameItem->level() == 2 && leftNameItem->parentIndex() == right.row())
+        {
+            return sortOrder() != Qt::AscendingOrder;
+        }
+        if (rightNameItem->level() == 2 && rightNameItem->parentIndex() == left.row())
+        {
+            return sortOrder() == Qt::AscendingOrder;
+        }
+    }
+
+    const int leftParentIndex = leftNameItem->level() == 2 ? leftNameItem->parentIndex() : left.row();
+    const int rightParentIndex = rightNameItem->level() == 2 ? rightNameItem->parentIndex() : right.row();
+
+    int leftRow;
+    int rightRow;
+    if (leftParentIndex != rightParentIndex)
+    {
+        // Sort by parent index (TestSuite) when Tests have not the same parent
+        leftRow = leftParentIndex;
+        rightRow = rightParentIndex;
+    }
+    else
+    {
+        // Sort by child index (Test)
+        leftRow = left.row();
+        rightRow = right.row();
+    }
+
+    if (left.column() == GTestModel::TestNumber)
+    {
+        return leftRow < rightRow;
+    }
+    if (left.column() == GTestModel::Name)
+    {
+        return QSortFilterProxyModel::lessThan(sourceModel()->index(leftRow, GTestModel::Name),
+                                               sourceModel()->index(rightRow, GTestModel::Name));
+    }
+    // Sort by ResultTime
+    const FlatDomeItemPtr leftResultItem = static_cast<GTestModel *>(sourceModel())->itemForIndex(
+        sourceModel()->index(leftRow, left.column()));
+    const FlatDomeItemPtr rightResultItem = static_cast<GTestModel *>(sourceModel())->itemForIndex(
+        sourceModel()->index(rightRow, right.column()));
+    if (leftResultItem && rightResultItem)
+    {
+        return leftResultItem->node().attributes().namedItem("time").nodeValue().toDouble() <
+               rightResultItem->node().attributes().namedItem("time").nodeValue().toDouble();
+    }
+    if (leftResultItem)
+    {
+        return true;
+    }
+    if (rightResultItem)
+    {
+        return false;
+    }
+    // Keep same order by default
+    return leftRow < rightRow;
+}

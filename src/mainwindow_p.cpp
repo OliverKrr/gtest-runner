@@ -153,13 +153,10 @@ MainWindowPrivate::MainWindowPrivate(const QStringList&, const bool reset, MainW
     testCaseFilterIgnored->setChecked(true);
     testCaseFilterIgnored->setText("Show Ignored");
 
-    // TODO: disable sorting for now -> need to ensure that "TestAll/Suite" doesn't get mixed up
-    // TODO: when sort on success -> toggle between time & failure
-    // TODO: compare code against original -> also auto-format before
-    // TODO: fix auto-update of view when there are new results
     // TODO: test breakOnFailure -> disable if not working?
+    // TODO: test default new options when loading from prev version
     testCaseTableView->setSortingEnabled(false);
-    //testCaseTableView->sortByColumn(GTestModel::TestNumber, Qt::AscendingOrder);
+    testCaseTableView->sortByColumn(GTestModel::TestNumber, Qt::AscendingOrder);
     testCaseTableView->setSelectionMode(QAbstractItemView::ExtendedSelection);
     testCaseTableView->setSelectionBehavior(QAbstractItemView::SelectRows);
     testCaseTableView->setWordWrap(false);
@@ -415,7 +412,7 @@ MainWindowPrivate::MainWindowPrivate(const QStringList&, const bool reset, MainW
                     return;
 
                 auto index = testCaseProxyModel->mapToSource(current);
-                if (index.row() < GTestModel::ResultAndTime)
+                if (index.column() < GTestModel::ResultAndTime)
                 {
                     // Auto-Select the first failure model
                     index = testCaseProxyModel->sourceModel()->index(index.row(), GTestModel::ResultAndTime,
@@ -1054,8 +1051,7 @@ void MainWindowPrivate::selectTest(const QString& testPath) const
 
     testCaseProxyModel->setSourceModel(testsController_->gTestModel(testPath).get());
     failureProxyModel->invalidate();
-    // TODO: disable for now -> see TODO add beginning
-    //testCaseTableView->setSortingEnabled(true);
+    testCaseTableView->setSortingEnabled(true);
 
     // make sure the right entry is selected
     executableTreeView->setCurrentIndex(executableModel->index(testPath));

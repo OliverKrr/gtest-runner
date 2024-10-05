@@ -129,7 +129,7 @@ void FlatDomeItemHandler::addItem(const QDomNode& node, const int level, int& ro
     items_.emplace_back(item);
     if (parentIndex >= 0)
     {
-        items_[static_cast<size_t>(parentIndex)]->addChildIndex(items_.size() - 1);
+        items_[static_cast<size_t>(parentIndex)]->addChildIndex(static_cast<int>(items_.size() - 1));
     }
 }
 

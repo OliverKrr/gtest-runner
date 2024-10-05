@@ -84,6 +84,8 @@ protected:
 
 	bool filterAcceptsAncestor(int sourceRow) const;
 
+	bool lessThan(const QModelIndex& left, const QModelIndex& right) const override;
+
 private:
 	bool showNotExecuted_ = true;
 	bool showPassed_ = true;
