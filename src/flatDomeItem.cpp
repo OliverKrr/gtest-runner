@@ -92,12 +92,21 @@ void FlatDomeItemHandler::addChildren(const QDomNode& node, const QDomNode& refe
         }
 
         QString referenceChildName = referenceChildNode.attributes().namedItem("name").nodeValue();
+        // If we have a value_param use it, as the name is most likely only enumerated
+        if (referenceChildNode.attributes().contains("value_param"))
+        {
+            referenceChildName = referenceChildNode.attributes().namedItem("value_param").nodeValue();
+        }
         bool found = false;
         for (int j = currentOffset; j < node.childNodes().count(); ++j)
         {
             // Search if we contain node from reference
             const auto& childNode = node.childNodes().item(j);
             QString childName = childNode.attributes().namedItem("name").nodeValue();
+            if (childNode.attributes().contains("value_param"))
+            {
+                childName = childNode.attributes().namedItem("value_param").nodeValue();
+            }
             if (referenceChildName == childName)
             {
                 found = true;
