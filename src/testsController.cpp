@@ -124,7 +124,7 @@ bool TestsController::loadLatestTestResult(const QString& path, int& numberError
     }
 
     if (testData->testResults_.empty() ||
-        testData->testResults_.back().testResultFile_ != currentResultFiles.front())
+        !testData->testResults_.back().testResultFile_.endsWith(currentResultFiles.front()))
     {
         if (!addTestResultData(path, currentResultFiles.front(), testData, false))
         {
