@@ -42,6 +42,14 @@
 
 A Qt5 based automated test-runner and Graphical User Interface for our Google Test unit tests.
 
+## Automatic test list update
+
+![Automatic test list update](resources/screenshots/feature1.png)
+
+- Enable `Options -> Auto-Update the Test List after Build` to automatically update the available test list
+- Gtest-runner uses file system watchers do detect every time your test has changed (e.g. when you build it), and automatically update the available test list. This feature even works if you rebuild your test when gtest-runner is closed.
+- Use `Update All Tests List` and `Update Test List` to manually update the available test list
+
 ## Automatic test running
 
 ![Automatic test running](resources/screenshots/feature0.png)
@@ -65,14 +73,14 @@ A Qt5 based automated test-runner and Graphical User Interface for our Google Te
 
 ![console](resources/screenshots/console.png)
 
-- All gtest console output is reatined (including syntax highlighting) and piped to the built-in console dock, so you get all the benefits of a GUI without losing any of your debugging output. Plus, `gtest-runner` adds additional capabilities like a [search dialog](#search-failures) and [forward and backward failure navigation buttons](#nextprevious-failure).
-- _Note:_ you can enable all test output (Istd::cout, std::cerr) in `Options -> Pipe all test output to Console Output`. Some tests have a lot of console output.
+- All gtest console output is retained (including syntax highlighting) and piped to the built-in console dock, so you get all the benefits of a GUI without losing any of your debugging output. Plus, `gtest-runner` adds additional capabilities like a [search dialog](#search-failures) and [forward and backward failure navigation buttons](#nextprevious-failure).
+- _Note:_ you can enable all test output (std::cout, std::cerr) in `Options -> Pipe all test output to Console Output`. Some tests have a lot of console output.
 
 ## Fully customizable layout
 
 ![tab](resources/screenshots/tab.png)
 
-- Gtest-runner uses detachable docks for the test executable, failure, and conosle docks, so you can tab, rearrange, detach, or hide them to best suite your screen layout.
+- Gtest-runner uses detachable docks for the test executable, failure, and console docks, so you can tab, rearrange, detach, or hide them to the best suite your screen layout.
 
 ## Light and dark themes
 
@@ -108,15 +116,18 @@ A Qt5 based automated test-runner and Graphical User Interface for our Google Te
 ![Re-run test](resources/screenshots/run.png)
 
 - You can manually re-run a test at any time by right-clicking on it and selecting `Run Test` or with `F5`
-- You can run all tests with corresponding button in tool bar or with `F6` (toggle `Run tests synchronous and not parallel` option to disable parallel test execution)
+- You can run all tests with corresponding button in toolbar or with `F6` (toggle `Run tests synchronous and not parallel` option to disable parallel test execution)
+- Use `Run Failed Tests` (`F3`) and `Run All Failed Tests` (`F4`) to re-run only the failed tests
+	- This will create a temporary `gtest-filter` to run only the failed tests
+    - The temporary filter is logged to the console
 
 ## Re-run specific Test Suite or Case
 
 ![Re-run Test Case](resources/screenshots/run2.png)
 ![Re-run Test Suite](resources/screenshots/run3.png)
 
-- Runs the test suite or case with a pre-defined `gtest-filter`. So that only a sub-set of tests are run
-- If you want to run all tests again, than run `AllTests` or clearing the `gtest-filter` manually next to the test executable
+- Runs the test suite or case with a temporary `gtest-filter`. So that only a sub-set of tests are run
+- The temporary filter is logged to the console
 
 ## Kill test
 
@@ -124,13 +135,13 @@ A Qt5 based automated test-runner and Graphical User Interface for our Google Te
 
 - Did you just actually click run on your 4-hour CPU intensive test? No problem! Cancel a test at any time by right-clicking on it, and selecting `Kill Test` or `Shift + F5`.
 - _Hint:_ if the `Kill Test` option is grayed out, that means your test isn't running (even if it has a yellow indicator).
-- Use corresponding button in tool bar or `Shift + F6` to kill all running tests
+- Use corresponding button in toolbar or `Shift + F6` to kill all running tests
 
 ## gtest command line options
 
 ![gtest command line](resources/screenshots/commandLine.png)
 
-- Clicking on the hamburger menu to the left of the test executable name will pop up the `gtest command line` dialogue, allowing access to all of the options you'd have if you ran your test directly from a terminal.
+- Clicking on the hamburger menu to the left of the test executable name will pop up the `gtest command line` dialogue, allowing access to all the options you'd have if you ran your test directly from a terminal.
 
 ## Enable/disable autorun
 
@@ -166,9 +177,13 @@ A Qt5 based automated test-runner and Graphical User Interface for our Google Te
 ![Sort](resources/screenshots/sort.png)
 
 - The test case list can be sorted by any column. The default sort is the to show the tests in order. To change sort, just click on any of the column headers. Click the header again the alternate between ascending/descending order.
-- _Note:_ The current sort column is indicated by the arrow ofabove the column title (in this example, `Failures`).
+- _Note:_ The current sort column is indicated by the arrow of above the column title (in this example, `Failures`).
 
 ## Filter failures
+
+- Use `Show Not Executed`, `Show Passed` and `Show Ignored` to quickly toggle between the different test types
+
+## Filter tests
 
 ![filter](resources/screenshots/filter.png)
 
@@ -187,7 +202,7 @@ A Qt5 based automated test-runner and Graphical User Interface for our Google Te
 
 ## Open in IDE
 
-- Double clicking any failure will automatically open the file in your IDE (or whichever program is associated with the file extension). It will also copy the line number of the failure to the clipboard. In almost every editor, you can then quickly jump to the failure location with the shortcut `Ctrl-G, Ctrl-V, ENTER`.
+- Double-clicking any failure will automatically open the file in your IDE (or whichever program is associated with the file extension). It will also copy the line number of the failure to the clipboard. In almost every editor, you can then quickly jump to the failure location with the shortcut `Ctrl-G, Ctrl-V, ENTER`.
 
 ## Full GTest error message
 
@@ -203,7 +218,7 @@ A Qt5 based automated test-runner and Graphical User Interface for our Google Te
 
 ![Find](resources/screenshots/find.png)
 
-- Open a `Find` window with the keyboard shortcut `Ctrl-F`, or by right clicking in the console window and selecting it from the menu. You can use the `Find` dialog to search the console output for specific failures or `std::cout` messages.
+- Open a `Find` window with the keyboard shortcut `Ctrl-F`, or by right-clicking in the console window and selecting it from the menu. You can use the `Find` dialog to search the console output for specific failures or `std::cout` messages.
 
 ## Next/previous failure
 
