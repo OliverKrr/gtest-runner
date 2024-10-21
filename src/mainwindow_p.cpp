@@ -1813,18 +1813,19 @@ void testFilterForTestCase(const GTestModel& testModel, const QModelIndex& testI
 QString MainWindowPrivate::testFilterForAllFailedTests(const QString& testPath) const
 {
     QString testFilter;
-    const auto testModel = testsController_->gTestModel(testPath);
+    const auto& testModel = testsController_->gTestModel(testPath);
     for (int i = 0; i < testModel->rowCount(); ++i)
     {
-        const auto testCaseSourceIndex = testModel->index(i, GTestModel::ResultAndTime);
-        const FlatDomeItemPtr item = testModel->itemForIndex(testCaseSourceIndex);
+        const auto& testCaseSourceIndex = testModel->index(i, GTestModel::ResultAndTime);
+        const FlatDomeItemPtr& item = testModel->itemForIndex(testCaseSourceIndex);
         // Only check TestCases
         if (item &&
             item->level() == 2)
         {
             if (testModel->data(testCaseSourceIndex, GTestModel::FailureRole).toInt() != 0)
             {
-                testFilterForTestCase(*testModel, testCaseSourceIndex, testFilter);
+                const auto& nameIndex = testModel->index(testCaseSourceIndex.row(), GTestModel::Name);
+                testFilterForTestCase(*testModel, nameIndex, testFilter);
             }
         }
     }
