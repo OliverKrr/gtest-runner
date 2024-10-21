@@ -36,6 +36,7 @@
 
 #include "flatDomeItem.h"
 
+#include <QStringList>
 #include <utility>
 
 
@@ -79,6 +80,27 @@ FlatDomeItemHandler::FlatDomeItemHandler(const QDomNode& rootNode, const QDomNod
     addChildren(rootNode, rootReferenceNode, level, row, -1);
 }
 
+namespace
+{
+QString itemName(const QDomNamedNodeMap& attributes)
+{
+    auto name = attributes.namedItem("name").nodeValue();
+    // If we have a value_param use it, as the suffix part of the name is most likely only enumerated
+    if (attributes.contains("value_param"))
+    {
+        const auto nameSplit = name.split("/");
+        bool ok = false;
+        if (nameSplit.length() == 2 &&
+            nameSplit[1].toInt(&ok) >= 0 &&
+            ok)
+        {
+            return nameSplit[0] + attributes.namedItem("value_param").nodeValue();
+        }
+    }
+    return name;
+}
+}
+
 void FlatDomeItemHandler::addChildren(const QDomNode& node, const QDomNode& referenceNode,
                                       const int level, int& row, const int parentIndex)
 {
@@ -91,23 +113,13 @@ void FlatDomeItemHandler::addChildren(const QDomNode& node, const QDomNode& refe
             continue;
         }
 
-        QString referenceChildName = referenceChildNode.attributes().namedItem("name").nodeValue();
-        // If we have a value_param use it, as the name is most likely only enumerated
-        if (referenceChildNode.attributes().contains("value_param"))
-        {
-            referenceChildName = referenceChildNode.attributes().namedItem("value_param").nodeValue();
-        }
+        const QString referenceChildName = itemName(referenceChildNode.attributes());
         bool found = false;
         for (int j = currentOffset; j < node.childNodes().count(); ++j)
         {
             // Search if we contain node from reference
             const auto& childNode = node.childNodes().item(j);
-            QString childName = childNode.attributes().namedItem("name").nodeValue();
-            if (childNode.attributes().contains("value_param"))
-            {
-                childName = childNode.attributes().namedItem("value_param").nodeValue();
-            }
-            if (referenceChildName == childName)
+            if (referenceChildName == itemName(childNode.attributes()))
             {
                 found = true;
                 currentOffset = j;
