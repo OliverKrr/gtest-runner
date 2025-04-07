@@ -131,7 +131,7 @@ QExecutableSettingsDialog::QExecutableSettingsDialog(QWidget* parent /*= (QObjec
 
 	d->gtestFilterEdit->setFocus();
 
-	connect(d->gtestShuffleCheckbox, &QCheckBox::stateChanged, d->gtestRandomSeedLineEdit, &QLineEdit::setEnabled);
+	connect(d->gtestShuffleCheckbox, &QCheckBox::checkStateChanged, d->gtestRandomSeedLineEdit, &QLineEdit::setEnabled);
 	connect(d->buttonBox, &QDialogButtonBox::accepted, this, &QExecutableSettingsDialog::accept);
 	connect(d->buttonBox, &QDialogButtonBox::rejected, this, &QExecutableSettingsDialog::reject);
 }

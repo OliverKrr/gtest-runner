@@ -5,7 +5,7 @@
 
 #include <QtGui>
 #include <QTextEdit>
-#include <QRegExp>
+#include <QRegularExpression>
 
 #include "findform.h"
 #include "ui_findreplaceform.h"

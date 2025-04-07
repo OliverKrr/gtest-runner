@@ -24,7 +24,7 @@
 
 /* QToolTip ---------------------------------------------------------------
 
-https://doc.qt.io/qt-5/stylesheet-examples.html#customizing-qtooltip
+https://doc.qt.io/qt-6/stylesheet-examples.html#customizing-qtooltip
 
 --------------------------------------------------------------------------- */
 QToolTip {
@@ -38,7 +38,7 @@ QToolTip {
 
 /* QStatusBar -------------------------------------------------------------
 
-https://doc.qt.io/qt-5/stylesheet-examples.html#customizing-qstatusbar
+https://doc.qt.io/qt-6/stylesheet-examples.html#customizing-qstatusbar
 
 --------------------------------------------------------------------------- */
 QStatusBar {

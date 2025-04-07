@@ -196,13 +196,13 @@ public:
 
     bool removeRows(int row, const int count, const QModelIndex& parent = QModelIndex()) override
     {
-        iterator parentItr = indexToIterator(parent);
+        auto parentItr = indexToIterator(parent);
 
         if (tree.child_count(parentItr) < row || tree.child_count(parentItr) < row + count)
             return false;
 
         beginRemoveRows(parent, row, row + count - 1);
-        iterator toRemove = tree.child_at(parentItr, row);
+        auto toRemove = tree.child_at(parentItr, row);
 
         for (int i = 0; i < count; ++i)
         {
@@ -373,7 +373,7 @@ public:
         QList<QModelIndex> list;
         for (int i = 0; i < rowCount(index); i++)
         {
-            list << index.child(i, 0);
+            list << this->index(i, 0, index);
         }
         return list;
     }

@@ -1,6 +1,7 @@
 #include "GTestFailureModel.h"
 #include "QStdOutSyntaxHighlighter.h"
 #include "mainwindow_p.h"
+
 #include "executableModelDelegate.h"
 #include "testsController.h"
 #include "utilities.h"
@@ -24,6 +25,12 @@
 #include <QMessageBox>
 #include <QListWidget>
 #include <QFileDialog>
+#include <QActionGroup>
+#include <QCryptographicHash>
+#include <QTimer>
+#include <QJsonArray>
+#include <QJsonObject>
+#include <QDirIterator>
 #include <thread>
 
 #ifndef Q_OS_WIN32
@@ -352,9 +359,9 @@ MainWindowPrivate::MainWindowPrivate(const QStringList&, const bool reset, MainW
     // filter test results when the filter is changed
     connect(testCaseFilterEdit, &QLineEdit::textChanged, this, [this](const QString& text)
     {
-        if (QRegExp(text).isValid())
+        if (QRegularExpression(text).isValid())
         {
-            testCaseProxyModel->setFilterRegExp(text);
+            testCaseProxyModel->setFilterRegularExpression(text);
             if (testCaseProxyModel->rowCount())
             {
                 for (int i = 0; i < testCaseProxyModel->columnCount(); ++i)
@@ -932,9 +939,8 @@ void MainWindowPrivate::runTestInThread(const QString& pathToTest, const QString
                 if (first)
                 {
                     // get the number of tests
-                    static QRegExp rx("([0-9]+) tests");
-                    (void) rx.indexIn(output);
-                    tests = rx.cap(1).toInt();
+                    static const QRegularExpression rx("([0-9]+) tests");
+                    tests = rx.match(output).captured(1).toInt();
                     if (tests)
                     {
                         first = false;
@@ -947,8 +953,8 @@ void MainWindowPrivate::runTestInThread(const QString& pathToTest, const QString
                 }
                 else
                 {
-                    const QRegExp rx(R"((\[.*OK.*\]|\[.*FAILED.*\]))");
-                    if (rx.indexIn(output) != -1)
+                    static const QRegularExpression rx(R"((\[.*OK.*\]|\[.*FAILED.*\]))");
+                    if (rx.globalMatch(output).hasNext())
                         progress++;
                 }
 
@@ -1428,7 +1434,7 @@ void MainWindowPrivate::createToolBar()
     runAllTestsAction = new QAction(QIcon(":images/runTest"), "Run All Tests", toolBar_);
     runAllTestsAction->setShortcut(QKeySequence(Qt::Key_F6));
     killAllTestsAction_ = new QAction(q->style()->standardIcon(QStyle::SP_BrowserStop), "Kill All Tests", toolBar_);
-    killAllTestsAction_->setShortcuts({QKeySequence(Qt::SHIFT + Qt::Key_F6), QKeySequence(Qt::SHIFT + Qt::Key_F4)});
+    killAllTestsAction_->setShortcuts({QKeySequence(Qt::SHIFT | Qt::Key_F6), QKeySequence(Qt::SHIFT | Qt::Key_F4)});
     updateAllTestsListAction = new QAction(QIcon(":images/updateTestList"), "Update All Tests List", toolBar_);
     updateAllTestsListAction->setShortcut(QKeySequence(Qt::Key_F8));
     revealExplorerTestResultAction_ = new QAction(q->style()->standardIcon(QStyle::SP_DirOpenIcon),
@@ -1450,8 +1456,8 @@ void MainWindowPrivate::createToolBar()
 
     connect(addRunEnvAction, &QAction::triggered, [this]()
     {
-    	const QString filter = "RunEnv (*.bat *.sh)";
-    	const QString caption = "Select RunEnv.bat or RunEnv.sh";
+        const QString filter = "RunEnv (*.bat *.sh)";
+        const QString caption = "Select RunEnv.bat or RunEnv.sh";
         const QString filename = QFileDialog::getOpenFileName(q_ptr, caption, currentRunEnvPath_, filter);
 
         if (filename.isEmpty())
@@ -1621,7 +1627,8 @@ void MainWindowPrivate::updateTestExecutables()
         if (testProcess.waitForFinished(500))
         {
             QString output = testProcess.readAllStandardOutput();
-            QStringList executables = output.split(QRegExp("[\r\n]"), Qt::SkipEmptyParts);
+            static const QRegularExpression sep("[\r\n]");
+            QStringList executables = output.split(sep, Qt::SkipEmptyParts);
             for (const auto& testExe : executables)
             {
                 QString name = QFileInfo(testExe).baseName();
@@ -1665,7 +1672,7 @@ void MainWindowPrivate::createExecutableContextMenu()
     runTestAction = new QAction(QIcon(":images/runTest"), "Run Test", executableTreeView);
     runTestAction->setShortcut(QKeySequence(Qt::Key_F5));
     killTestAction = new QAction(q->style()->standardIcon(QStyle::SP_BrowserStop), "Kill Test", executableTreeView);
-    killTestAction->setShortcuts({QKeySequence(Qt::SHIFT + Qt::Key_F5), QKeySequence(Qt::SHIFT + Qt::Key_F3)});
+    killTestAction->setShortcuts({QKeySequence(Qt::SHIFT | Qt::Key_F5), QKeySequence(Qt::SHIFT | Qt::Key_F3)});
     updateTestListAction = new QAction(QIcon(":images/updateTestList"), "Update Test List", executableTreeView);
     updateTestListAction->setShortcut(QKeySequence(Qt::Key_F7));
     revealExplorerTestAction_ = new QAction(q->style()->standardIcon(QStyle::SP_DirOpenIcon), "Reveal Test Results",

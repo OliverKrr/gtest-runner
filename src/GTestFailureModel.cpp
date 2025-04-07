@@ -140,7 +140,7 @@ QVariant GTestFailureModel::data(const QModelIndex &index, const int role) const
 Qt::ItemFlags GTestFailureModel::flags(const QModelIndex &index) const
 {
 	if (!index.isValid())
-		return nullptr;
+		return Qt::NoItemFlags;
 
 	return QAbstractItemModel::flags(index);
 }

@@ -49,7 +49,7 @@ bool GTestModelSortFilterProxy::filterAcceptsDescendant(const int sourceRow) con
         }
     }
 
-    return sourceModel()->data(nameRowToTest).toString().contains(filterRegExp());
+    return sourceModel()->data(nameRowToTest).toString().contains(filterRegularExpression());
 }
 
 // --------------------------------------------------------------------------------
@@ -78,7 +78,7 @@ bool GTestModelSortFilterProxy::filterAcceptsAncestor(const int sourceRow) const
         }
     }
 
-    return sourceModel()->data(nameRowToTest).toString().contains(filterRegExp());
+    return sourceModel()->data(nameRowToTest).toString().contains(filterRegularExpression());
 }
 
 bool GTestModelSortFilterProxy::checkShowItem(const FlatDomeItemPtr& resultItem, const QModelIndex& resultRowToTest,

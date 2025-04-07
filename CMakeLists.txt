@@ -2,8 +2,8 @@
 #	CMAKE SETTINGS
 #-------------------------------------------------------------------------------
 
-cmake_minimum_required(VERSION 2.8.12...3.28.6)
-set(QT_MINIMUM_VERSION 5.3.0)
+cmake_minimum_required(VERSION 2.8.12...4.0.0)
+set(QT_MINIMUM_VERSION 6.9.0)
 
 #-------------------------------------------------------------------------------
 #	PROJECT SETTINGS
@@ -56,13 +56,12 @@ endif()
 set(QT_ROOT_DIR $ENV{QT_ROOT_DIR} CACHE STRING "Qt install path")
 list(APPEND CMAKE_PREFIX_PATH ${QT_ROOT_DIR})
 
-# Find the necessary Qt5 modules
-find_package(Qt5Core REQUIRED)
-find_package(Qt5Gui REQUIRED)
-find_package(Qt5Widgets REQUIRED)
-find_package(Qt5Xml REQUIRED)
-find_package(Qt5XmlPatterns REQUIRED)
-find_package(Qt5Test REQUIRED)
+# Find the necessary Qt6 modules
+find_package(Qt6Core REQUIRED)
+find_package(Qt6Gui REQUIRED)
+find_package(Qt6Widgets REQUIRED)
+find_package(Qt6Xml REQUIRED)
+find_package(Qt6Test REQUIRED)
 
 # Test for supported Qt version
 find_program(QMAKE_EXECUTABLE NAMES qmake HINTS ${QT_ROOT_DIR} ENV QT_ROOT_DIR PATH_SUFFIXES bin)
@@ -79,15 +78,13 @@ find_package(Threads REQUIRED)
 #-------------------------------------------------------------------------------
 
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 20)
 
 if(MSVC)
   set(GUI_TYPE WIN32)
   add_compile_options(/MP)
 elseif(APPLE)
   set(GUI_TYPE MACOSX_BUNDLE)
-elseif(CMAKE_COMPILER_IS_GNUCXX)
-	add_compile_options(-std=c++14)
 endif(MSVC)
 
 #-------------------------------------------------------------------------------
@@ -105,7 +102,7 @@ configure_file(src/appinfo.h.in appinfo.h @ONLY NEWLINE_STYLE UNIX)
 #	SOURCE CODE
 #-------------------------------------------------------------------------------
 
-qt5_wrap_ui(UI_HDRS
+qt6_wrap_ui(UI_HDRS
 src/qtfindreplacedialog/findreplacedialog.ui
 src/qtfindreplacedialog/findreplaceform.ui
 )
@@ -181,7 +178,7 @@ list(APPEND QT_RESOURCES
 	resources/resources.qrc
 )
 
-qt5_add_resources(RESOURCES ${QT_RESOURCES})
+qt6_add_resources(RESOURCES ${QT_RESOURCES})
 
 list(APPEND RESOURCES
 	resources/resources.rc
@@ -211,12 +208,11 @@ list(REMOVE_DUPLICATES INCLUDE_DIRS)
 #-------------------------------------------------------------------------------
 
 list(APPEND LIBRARIES
-Qt5::Core
-Qt5::Gui
-Qt5::Widgets
-Qt5::Xml
-Qt5::XmlPatterns
-Qt5::Test
+Qt6::Core
+Qt6::Gui
+Qt6::Widgets
+Qt6::Xml
+Qt6::Test
 Threads::Threads
 )
 

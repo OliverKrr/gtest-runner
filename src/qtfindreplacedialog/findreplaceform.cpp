@@ -5,7 +5,7 @@
 
 #include <QtGui>
 #include <QTextEdit>
-#include <QRegExp>
+#include <QRegularExpression>
 #include <QJsonObject>
 
 #include "findreplaceform.h"
@@ -101,8 +101,8 @@ void FindReplaceForm::validateRegExp(const QString &text) {
         return; // nothing to validate
     }
 
-    QRegExp reg(text,
-                (ui->caseCheckBox->isChecked() ? Qt::CaseSensitive : Qt::CaseInsensitive));
+    QRegularExpression reg(text,
+                (ui->caseCheckBox->isChecked() ? QRegularExpression::NoPatternOption : QRegularExpression::CaseInsensitiveOption));
 
     if (reg.isValid()) {
         showError("");
@@ -157,8 +157,8 @@ void FindReplaceForm::find(const bool next) {
 
     if (ui->regexCheckBox->isChecked()) 
 	{
-        const QRegExp reg(toSearch,
-                          (ui->caseCheckBox->isChecked() ? Qt::CaseSensitive : Qt::CaseInsensitive));
+        const QRegularExpression reg(toSearch,
+                          (ui->caseCheckBox->isChecked() ? QRegularExpression::NoPatternOption : QRegularExpression::CaseInsensitiveOption));
 
         textCursor = textEdit->document()->find(reg, textCursor, flags);
         textEdit->setTextCursor(textCursor);

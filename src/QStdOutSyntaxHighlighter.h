@@ -35,15 +35,15 @@
 // 
 //--------------------------------------------------------------------------------------------------
 
-#ifndef QStdOutSyntaxHighlighter_h__
-#define QStdOutSyntaxHighlighter_h__
+#pragma once
 
 //------------------------
 //	INCLUDES
 //------------------------
 #include <QSyntaxHighlighter>
-#include <QTextEdit>
 #include <QColor>
+#include <QTextEdit>
+#include <QRegularExpression>
 
 //	----------------------------------------------------------------------------
 //	CLASS		QStdOutSyntaxHighlighter
@@ -60,22 +60,22 @@ class QStdOutSyntaxHighlighter : public QSyntaxHighlighter
 
 public:
 
-	QStdOutSyntaxHighlighter(QTextEdit* parent) : QSyntaxHighlighter(parent)
+	explicit QStdOutSyntaxHighlighter(QTextEdit* parent) : QSyntaxHighlighter(parent)
 	{
 		HighlightingRule rule;
 
  		blockFormat.setForeground(QColor("#00ff00"));
- 		rule.pattern = QRegExp("\\[((?!\\s+DEATH\\s+).)*\\]");
+ 		rule.pattern = QRegularExpression(R"(\[((?!\s+DEATH\s+).)*\])");
  		rule.format = blockFormat;
 		highlightingRules.append(rule);
 
 		errorFormat.setForeground(QColor("#ff0000"));
-		rule.pattern = QRegExp("\\[.*FAILED.*\\]");
+		rule.pattern = QRegularExpression("\\[.*FAILED.*\\]");
 		rule.format = errorFormat;
 		highlightingRules.append(rule);
 
 		errorFormat.setForeground(QColor("#ffd700"));
-		rule.pattern = QRegExp("TEST RUN .*");
+		rule.pattern = QRegularExpression("TEST RUN .*");
 		rule.format = errorFormat;
 		highlightingRules.append(rule);
 	}
@@ -83,12 +83,13 @@ public:
 	void highlightBlock(const QString &text) override
 	{
 		foreach(const HighlightingRule &rule, highlightingRules) {
-			QRegExp expression(rule.pattern);
-			int index = expression.indexIn(text);
-			while (index >= 0) {
-				const int length = expression.matchedLength();
+			QRegularExpression expression(rule.pattern);
+			auto i = expression.globalMatch(text);
+			while (i.hasNext()) {
+				const auto match = i.next();
+				const int index = match.capturedStart();
+				const int length = match.capturedLength();
 				setFormat(index, length, rule.format);
-				index = expression.indexIn(text, index + length);
 			}
 		}
 	}
@@ -97,7 +98,7 @@ private:
 
 	struct HighlightingRule
 	{
-		QRegExp					pattern;
+		QRegularExpression		pattern;
 		QTextCharFormat			format;
 	};
 
@@ -107,5 +108,3 @@ private:
 	QTextCharFormat				blockFormat;													///< Highlight style for network connection related messages.
 	QTextCharFormat				timestampFormat;												///< highlight style for timestamps
 };
-
-#endif // QStdErrSyntaxHighlighter_h__

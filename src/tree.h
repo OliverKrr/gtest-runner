@@ -1180,12 +1180,17 @@ protected:
 ///				interface.
 //  ----------------------------------------------------------------------------
 template <typename T>
-class ConstPreOrderIterator : public std::iterator<std::forward_iterator_tag, T>
+class ConstPreOrderIterator
 {
 
 	template <class C> friend class Tree;
 
 public:
+	using iterator_category = std::forward_iterator_tag;
+	using value_type        = T;
+	using difference_type   = std::ptrdiff_t;
+	using pointer           = T*;
+	using reference         = T&;
 
 	/// Typedef for the TreeNodes child class iterator.
 	// Done this way because the type of this->m_children is an implementation detail of the TreeNode, and

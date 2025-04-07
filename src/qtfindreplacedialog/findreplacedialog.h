@@ -60,7 +60,7 @@ public slots:
     void findPrev();
 
 protected:
-    void changeEvent(QEvent *e);
+    void changeEvent(QEvent *e) override;
 
     Ui::FindReplaceDialog *ui;
 };

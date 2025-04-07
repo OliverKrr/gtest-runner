@@ -40,7 +40,7 @@
 
 ![](resources/screenshots/screen.png)
 
-A Qt5 based automated test-runner and Graphical User Interface for our Google Test unit tests.
+A Qt6 based automated test-runner and Graphical User Interface for our Google Test unit tests.
 
 ## Automatic test list update
 

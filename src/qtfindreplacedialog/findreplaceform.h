@@ -110,9 +110,9 @@ public slots:
     void replaceAll();
 
 protected:
-    void changeEvent(QEvent *e);
+    void changeEvent(QEvent *e) override;
 
-	virtual bool event(QEvent *e) override;
+	bool event(QEvent *e) override;
 	
     /// shows an error in the dialog
     void showError(const QString &error);

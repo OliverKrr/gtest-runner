@@ -55,11 +55,6 @@ int main(int argc, char *argv[])
 {
 	Q_INIT_RESOURCE(resources);
 
-// Enable high-DPI scaling with Qt 5.6+
-#if (QT_VERSION >= QT_VERSION_CHECK(5,6,0))
-	QApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
-#endif
-
 	const QApplication app(argc, argv);	
 	QApplication::setOrganizationName(APPINFO::organization);
 	QApplication::setOrganizationDomain(APPINFO::oranizationDomain);
@@ -87,11 +82,7 @@ int main(int argc, char *argv[])
 
 	if (parser.isSet(versionOption))
 	{
-#if (QT_VERSION >= QT_VERSION_CHECK(5,4,0))
 		parser.showVersion();
-#else
-		qDebug() << "gtest-runner" << APPINFO::version;
-#endif
 		exit(0);
 	}
 
