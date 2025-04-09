@@ -4,6 +4,9 @@
 #include <QMimeData>
 #include <QApplication>
 #include <QDockWidget>
+#include <QDragEnterEvent>
+#include <QDropEvent>
+#include <QFileInfo>
 
 //--------------------------------------------------------------------------------------------------
 //	FUNCTION: MainWindow
@@ -38,12 +41,13 @@ MainWindow::MainWindow(const QStringList& tests, const bool reset) : d_ptr(new M
     d->loadSettings();
 
     // add tests from the command line
-    // TODO: disable for now
-    //for (auto itr = tests.begin(); itr != tests.end(); ++itr)
-    //{
-    //	QFileInfo info(*itr);
-    //	d->addTestExecutable(info.absoluteFilePath(), true, info.lastModified());
-    //}
+    for (const auto& test : tests)
+    {
+        QFileInfo info(test);
+        QString name = info.baseName();
+        QString testDriver;
+        d_ptr->addTestExecutable(info.absoluteFilePath(), name, testDriver, true, info.lastModified());
+    }
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -78,13 +82,14 @@ QSize MainWindow::sizeHint() const
 //--------------------------------------------------------------------------------------------------
 void MainWindow::dragEnterEvent(QDragEnterEvent* e)
 {
-    // TODO: disable for now
-    // if (e->mimeData()->hasUrls())
-    // {
-    // 	QFileInfo info(e->mimeData()->urls().first().toLocalFile());
-    // 	if (info.isExecutable())
-    // 		e->acceptProposedAction();
-    // }
+    if (e->mimeData()->hasUrls())
+    {
+        const QFileInfo info(e->mimeData()->urls().first().toLocalFile());
+        if (info.isExecutable())
+        {
+            e->acceptProposedAction();
+        }
+    }
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -92,13 +97,14 @@ void MainWindow::dragEnterEvent(QDragEnterEvent* e)
 //--------------------------------------------------------------------------------------------------
 void MainWindow::dropEvent(QDropEvent* e)
 {
-    // TODO: disable for now
-    // if (e->mimeData()->hasUrls())
-    // {
-    // foreach (QUrl url, e->mimeData()->urls())
-    // {
-    // 		QFileInfo info(url.toLocalFile());
-    // 		d_ptr->addTestExecutable(info.absoluteFilePath(), true, info.lastModified());
-    // }
-    // }
+    if (e->mimeData()->hasUrls())
+    {
+        for (const auto& url : e->mimeData()->urls())
+        {
+            QFileInfo info(url.toLocalFile());
+            QString name = info.baseName();
+            QString testDriver;
+            d_ptr->addTestExecutable(info.absoluteFilePath(), name, testDriver, true, info.lastModified());
+        }
+    }
 }

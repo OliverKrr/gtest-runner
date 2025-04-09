@@ -12,6 +12,8 @@
 	- [System notifications](#system-notifications)
 	- [Gtest support](#gtest-support)
 - [Test Executable dock](#test-executable-dock)
+	- [Drag-and-drop](#drag-and-drop)
+	- [Easily add and remove tests](#easily-add-and-remove-tests)
 	- [Easily update tests](#Easily-update-tests)
 	- [Re-run test](#re-run-test)
 	- [Re-run specific Test Suite or Case](#re-run-specific-test-suite-or-case)
@@ -103,12 +105,23 @@ A Qt6 based automated test-runner and Graphical User Interface for our Google Te
 
 ![Test Executable Dock](resources/screenshots/testExecutableDock.png)
 
+## Drag-and-drop
+
+- To add a test executable to watch, simply drag-and-drop the test executable file anywhere on the `gtest-runner` GUI.
+
+## Easily add and remove tests
+
+![Add/remove](resources/screenshots/addRemove.png)
+
+- In addition to drag-and-drop, it's easy to add or remove a test using the right-click context menu in the `Test Executable` window.
+
 ## Easily update tests
 
 ![Test Executable Dock](resources/screenshots/addEnv.png)
 
-- Add all unit tests by selecting your `RunEnv.bat/sh`.
-- Click _Update Tests_ to update the executable list (e.g. new test targets added/build/removed)
+- Add all unit tests by selecting your `RunEnv.bat/sh`
+- If `RunEnv.bat/sh` is not required use a dummy script
+- Click _Update Tests_ searching for `TestDriver.py` to update the executable list (e.g. new test targets added/build/removed)
 - You can start multiple instances of gtest-runner for each RunEnv.bat/sh dir
 
 ## Re-run test

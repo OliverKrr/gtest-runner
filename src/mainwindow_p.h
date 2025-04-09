@@ -145,6 +145,7 @@ public:
     QAction* runFailedTestAction; ///< Manually forces a test-run for only failed tests
     QAction* runTestAction; ///< Manually forces a test-run.
     QAction* updateTestListAction; ///< Manually forces an update test list
+    QAction* addTestAction; ///< Opens a dialog to add a test executable.
     QAction* removeTestAction; ///< Removes a test from being watched.
     // Remove all tests
     QAction* removeAllTestsAction_;

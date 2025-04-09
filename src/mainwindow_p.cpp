@@ -739,6 +739,15 @@ void MainWindowPrivate::runTestInThread(const QString& pathToTest, const QString
                     if (runMode == RunTests)
                     {
                         output = testProcess.readAllStandardOutput();
+                        if (const auto errorOut = testProcess.readAllStandardError();
+                            !errorOut.isEmpty())
+                        {
+                            if (!output.isEmpty())
+                            {
+                                output += "\n";
+                            }
+                            output += errorOut;
+                        }
                     }
 
                     // 0 for success and 1 if test have failed -> in both cases a result xml was generated
@@ -799,6 +808,15 @@ void MainWindowPrivate::runTestInThread(const QString& pathToTest, const QString
                 testProcess.waitForFinished();
             }
             QString output = testProcess.readAllStandardOutput();
+            if (const auto errorOut = testProcess.readAllStandardError();
+                !errorOut.isEmpty())
+            {
+                if (!output.isEmpty())
+                {
+                    output += "\n";
+                }
+                output += errorOut;
+            }
             output.append(
                 "\nTEST RUN KILLED: " + QDateTime::currentDateTime().toString("yyyy-MMM-dd hh:mm:ss.zzz") + " " +
                 testName + "\n\n");
@@ -826,16 +844,20 @@ void MainWindowPrivate::runTestInThread(const QString& pathToTest, const QString
         // SET GTEST ARGS
         const QModelIndex index = executableModel->index(pathToTest);
         const QString testDriver = executableModel->data(index, QExecutableModel::TestDriverRole).toString();
+        const bool hasTestDriver = !testDriver.isEmpty();
 
         QStringList arguments;
 
-        arguments << testDriver;
-        arguments << "-C";
-        arguments << info.dir().dirName();
-
-        if (pipeAllTestOutput_->isChecked())
+        if (hasTestDriver)
         {
-            arguments << "--pipe-log";
+            arguments << testDriver;
+            arguments << "-C";
+            arguments << info.dir().dirName();
+
+            if (pipeAllTestOutput_->isChecked())
+            {
+                arguments << "--pipe-log";
+            }
         }
 
         QString gtestFileName;
@@ -848,7 +870,7 @@ void MainWindowPrivate::runTestInThread(const QString& pathToTest, const QString
             const auto currentTime = QDateTime::currentDateTime().toString(DATE_FORMAT);
             gtestFileName = outputDir + "/" + currentTime + "_" + GTEST_RESULT_NAME;
         }
-        arguments << "--gtest_output=xml:\"" + gtestFileName + "\"";
+        arguments << "--gtest_output=xml:" + gtestFileName;
 
         int repeatCount = 1;
         if (runMode != RunTests)
@@ -857,12 +879,15 @@ void MainWindowPrivate::runTestInThread(const QString& pathToTest, const QString
         }
         else
         {
-            const QString latestCopyDir = outputDir + "/" + LATEST_RESULT_DIR_NAME;
-            QDir(latestCopyDir).removeRecursively();
-            (void) QDir(latestCopyDir).mkpath(".");
+            if (hasTestDriver)
+            {
+                const QString latestCopyDir = outputDir + "/" + LATEST_RESULT_DIR_NAME;
+                QDir(latestCopyDir).removeRecursively();
+                (void) QDir(latestCopyDir).mkpath(".");
 
-            arguments << "--output-dir";
-            arguments << latestCopyDir;
+                arguments << "--output-dir";
+                arguments << latestCopyDir;
+            }
 
             // Take temp test filter if given. Otherwise, take configured
             if (!tempTestFilter.isEmpty())
@@ -906,19 +931,37 @@ void MainWindowPrivate::runTestInThread(const QString& pathToTest, const QString
         }
 
 #ifdef Q_OS_WIN32
-        QString cmd = "\"" + currentRunEnvPath_ + "\" && " PYTHON;
+        QString cmd = "\"" + currentRunEnvPath_ + "\" && ";
+        if (hasTestDriver)
+        {
+            cmd += PYTHON;
+        }
+        else
+        {
+            cmd += "\"" + pathToTest + "\"";
+        }
         // Start the test
         testProcess.start(cmd, arguments);
 #else
-                QString cmd = "bash -c \"source " + currentRunEnvPath_ + "; " PYTHON " " + arguments.join(" ") +  "\"";
-                // Start the test
-                testProcess.start(cmd);
+        QString cmd = "bash -c \"source " + currentRunEnvPath_ + "; ";
+        if (hasTestDriver)
+        {
+            cmd += PYTHON;
+        }
+        else
+        {
+            cmd += pathToTest;
+        }
+        cmd += " " + arguments.join(" ") + "\"";
+        // Start the test
+        testProcess.start(cmd);
 #endif
 
         // get the first line of output. If we don't get it in a timely manner, the test is
         // probably bugged out so kill it.
         if (!testProcess.waitForReadyRead(10000))
         {
+            emit testOutputReady(QString("Error starting the process: %1\n").arg(testProcess.errorString()));
             testProcess.kill();
 
             executableModel->setData(executableModel->index(pathToTest), ExecutableData::NOT_RUNNING,
@@ -930,10 +973,8 @@ void MainWindowPrivate::runTestInThread(const QString& pathToTest, const QString
         // print test output as it becomes available
         if (runMode == RunTests)
         {
-            connect(&testProcess, &QProcess::readyReadStandardOutput, &loop, [&, pathToTest]
+            const auto handleOutput = [&, pathToTest](const QString& output)
             {
-                const QString output = testProcess.readAllStandardOutput();
-
                 // parse the first output line for the number of tests so we can
                 // keep track of progress
                 if (first)
@@ -960,6 +1001,16 @@ void MainWindowPrivate::runTestInThread(const QString& pathToTest, const QString
 
                 emit testProgress(pathToTest, progress, tests);
                 emit testOutputReady(output);
+            };
+
+            connect(&testProcess, &QProcess::readyReadStandardOutput, &loop, [&]
+            {
+                handleOutput(testProcess.readAllStandardOutput());
+            }, Qt::QueuedConnection);
+
+            connect(&testProcess, &QProcess::readyReadStandardError, &loop, [&]
+            {
+                handleOutput(testProcess.readAllStandardError());
             }, Qt::QueuedConnection);
         }
 
@@ -1439,6 +1490,7 @@ void MainWindowPrivate::createToolBar()
     updateAllTestsListAction->setShortcut(QKeySequence(Qt::Key_F8));
     revealExplorerTestResultAction_ = new QAction(q->style()->standardIcon(QStyle::SP_DirOpenIcon),
                                                   "Reveal Test Result Dir", toolBar_);
+    addTestAction = new QAction(QIcon(":images/addTest"), "Add Test", toolBar_);
     removeAllTestsAction_ = new QAction(q->style()->standardIcon(QStyle::SP_TrashIcon), "Remove All Tests", toolBar_);
 
     toolBar_->addWidget(new QLabel("Env:", toolBar_));
@@ -1452,6 +1504,7 @@ void MainWindowPrivate::createToolBar()
     toolBar_->addAction(killAllTestsAction_);
     toolBar_->addAction(updateAllTestsListAction);
     toolBar_->addAction(revealExplorerTestResultAction_);
+    toolBar_->addAction(addTestAction);
     toolBar_->addAction(removeAllTestsAction_);
 
     connect(addRunEnvAction, &QAction::triggered, [this]()
@@ -1564,6 +1617,35 @@ void MainWindowPrivate::createToolBar()
         QDesktopServices::openUrl(QUrl::fromLocalFile(dataPath()));
     });
 
+    connect(addTestAction, &QAction::triggered, [this]()
+    {
+        QString filter;
+#ifdef Q_OS_WIN32
+        filter = "Test Executables (*.exe)";
+#else
+    filter = "Test Executables (*)";
+#endif
+        QString filename;
+        QStringList filenames = QFileDialog::getOpenFileNames(q_ptr, "Select Test Executable", currentRunEnvPath_,
+                                                              filter);
+
+        for (const auto& file : filenames)
+        {
+            const QModelIndex existingIndex = executableModel->index(file);
+            if (!existingIndex.isValid())
+            {
+                const QFileInfo info(file);
+                const QString name = info.baseName();
+                const QString testDriver;
+                addTestExecutable(file, name, testDriver, true, info.lastModified());
+            }
+            else
+            {
+                executableTreeView->setCurrentIndex(existingIndex);
+            }
+        }
+    });
+
     connect(removeAllTestsAction_, &QAction::triggered, [this]
     {
         removeAllTest();
@@ -1631,7 +1713,8 @@ void MainWindowPrivate::updateTestExecutables()
             QStringList executables = output.split(sep, Qt::SkipEmptyParts);
             for (const auto& testExe : executables)
             {
-                QString name = QFileInfo(testExe).baseName();
+                QFileInfo info(testExe);
+                QString name = info.baseName();
                 // Only add suffix if more than one build
                 if (executables.size() != 1)
                 {
@@ -1645,7 +1728,8 @@ void MainWindowPrivate::updateTestExecutables()
                         name.append(" (MinSizeRel)");
                 }
 
-                addTestExecutable(testExe.trimmed(), name, testDriverFileInfo.absoluteFilePath(), false, QDateTime());
+                addTestExecutable(testExe.trimmed(), name, testDriverFileInfo.absoluteFilePath(), false,
+                                  info.lastModified());
             }
         }
         else
@@ -1692,6 +1776,7 @@ void MainWindowPrivate::createExecutableContextMenu()
     executableContextMenu->addAction(updateTestListAction);
     executableContextMenu->addAction(revealExplorerTestAction_);
     executableContextMenu->addSeparator();
+    executableContextMenu->addAction(addTestAction);
     executableContextMenu->addAction(removeTestAction);
 
     executableTreeView->setContextMenuPolicy(Qt::CustomContextMenu);
@@ -2018,6 +2103,7 @@ void MainWindowPrivate::createTestMenu()
     testMenu->addAction(killAllTestsAction_);
     testMenu->addAction(updateAllTestsListAction);
     testMenu->addAction(revealExplorerTestResultAction_);
+    testMenu->addAction(addTestAction);
     testMenu->addAction(removeAllTestsAction_);
 
     q->menuBar()->addMenu(testMenu);
