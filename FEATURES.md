@@ -88,7 +88,7 @@ A Qt6 based automated test-runner and Graphical User Interface for our Google Te
 
 ![light theme](resources/screenshots/theme.png) ![dark theme](resources/screenshots/theme2.png)
 
-- Easily switch between your system's default color theme or a breeze-inspired dark theme.
+- Easily switch between your system's default color theme, light or a dark theme.
 
 ## System notifications
 

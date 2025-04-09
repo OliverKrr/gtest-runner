@@ -184,6 +184,7 @@ public:
     QMenu* themeMenu; ///< Menu for selecting themes.
     QActionGroup* themeActionGroup; ///< Action group for selecting a theme option.
     QAction* defaultThemeAction; ///< System default theme.
+    QAction* lightThemeAction; ///< Light theme.
     QAction* darkThemeAction; ///< Dark theme.
 
     QMenu* helpMenu; ///< Help menu

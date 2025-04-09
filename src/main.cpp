@@ -46,6 +46,7 @@
 #include <QtGlobal>
 #include <QCommandLineParser>
 #include <QCommandLineOption>
+#include <QStyleFactory>
 
 // gtest-runner
 #include "appinfo.h"
@@ -55,7 +56,8 @@ int main(int argc, char *argv[])
 {
 	Q_INIT_RESOURCE(resources);
 
-	const QApplication app(argc, argv);	
+	const QApplication app(argc, argv);
+	QApplication::setStyle(QStyleFactory::create("Fusion"));
 	QApplication::setOrganizationName(APPINFO::organization);
 	QApplication::setOrganizationDomain(APPINFO::oranizationDomain);
 	QApplication::setApplicationName(APPINFO::name);

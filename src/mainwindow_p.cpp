@@ -31,6 +31,7 @@
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QDirIterator>
+#include <QStyleHints>
 #include <thread>
 
 #ifndef Q_OS_WIN32
@@ -2177,7 +2178,15 @@ void MainWindowPrivate::createThemeMenu()
     defaultThemeAction->setCheckable(true);
     connect(defaultThemeAction, &QAction::triggered, [&]()
     {
-        qApp->setStyleSheet(QString());
+        qApp->styleHints()->setColorScheme(Qt::ColorScheme::Unknown);
+    });
+
+    lightThemeAction = new QAction("Light Theme", themeMenu);
+    lightThemeAction->setObjectName("lightThemeAction");
+    lightThemeAction->setCheckable(true);
+    connect(lightThemeAction, &QAction::triggered, [&]()
+    {
+        qApp->styleHints()->setColorScheme(Qt::ColorScheme::Light);
     });
 
     darkThemeAction = new QAction("Dark Theme", themeMenu);
@@ -2185,24 +2194,16 @@ void MainWindowPrivate::createThemeMenu()
     darkThemeAction->setCheckable(true);
     connect(darkThemeAction, &QAction::triggered, [&]()
     {
-        QFile f(":styles/qdarkstyle");
-        if (!f.exists())
-        {
-            printf("Unable to set stylesheet, file not found\n");
-        }
-        else
-        {
-            f.open(QFile::ReadOnly | QFile::Text);
-            QTextStream ts(&f);
-            qApp->setStyleSheet(ts.readAll());
-        }
+        qApp->styleHints()->setColorScheme(Qt::ColorScheme::Dark);
     });
 
     themeMenu->addAction(defaultThemeAction);
+    themeMenu->addAction(lightThemeAction);
     themeMenu->addAction(darkThemeAction);
 
     themeActionGroup = new QActionGroup(themeMenu);
     themeActionGroup->addAction(defaultThemeAction);
+    themeActionGroup->addAction(lightThemeAction);
     themeActionGroup->addAction(darkThemeAction);
 
     q->menuBar()->addMenu(themeMenu);
