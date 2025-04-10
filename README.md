@@ -1,6 +1,6 @@
 # gtest-runner
 
-![license](https://img.shields.io/badge/license-MIT-orange.svg) ![copyright](https://img.shields.io/badge/%C2%A9-Nic_Holthaus-orange.svg) ![copyright](https://img.shields.io/badge/%C2%A9-Oliver_Karrenbauer-orange.svg) ![language](https://img.shields.io/badge/language-c++-blue.svg) ![c++](https://img.shields.io/badge/std-c++20-blue.svg) ![Qt](https://img.shields.io/badge/Qt-6-blue.svg)<br>![msvc2022](https://img.shields.io/badge/MSVC-2022-ff69b4.svg) ![gcc-13](https://img.shields.io/badge/GCC-13-ff69b4.svg)
+![Build Master](https://github.com/OliverKrr/gtest-runner/actions/workflows/build.yaml/badge.svg?branch=master) ![license](https://img.shields.io/badge/license-MIT-orange.svg) ![copyright](https://img.shields.io/badge/%C2%A9-Nic_Holthaus-orange.svg) ![copyright](https://img.shields.io/badge/%C2%A9-Oliver_Karrenbauer-orange.svg) ![language](https://img.shields.io/badge/language-c++-blue.svg) ![c++](https://img.shields.io/badge/std-c++20-blue.svg) ![Qt](https://img.shields.io/badge/Qt-6-blue.svg)<br>![msvc2022](https://img.shields.io/badge/MSVC-2022-ff69b4.svg) ![gcc-13](https://img.shields.io/badge/GCC-13-ff69b4.svg)
 
 A Qt6 based automated test-runner and Graphical User Interface for Google Test unit tests.
 This project is a fork of [nholthaus/gtest-runner](https://github.com/nholthaus/gtest-runner) with further improvements and adaptions.
@@ -46,9 +46,7 @@ To date, gtest-runner has been tested on:
 
 ## Windows
 
-Visit the [Latest release page](https://github.com/OliverKrr/gtest-runner/releases) for binary installers. 
-
-Since version 1.1.2, all Windows binaries are signed.
+Visit the [Latest release page](https://github.com/OliverKrr/gtest-runner/releases) for binary installers.
 
 ## Ubuntu
 

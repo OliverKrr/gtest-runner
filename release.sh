@@ -1,8 +1,7 @@
 mkdir -p build
 cd build || exit
-# Replace -A x64 with -G "Ninja Multi-Config"
-cmake -A x64 ..
+# To use Visual Studio generator, replace -G "Ninja Multi-Config" with -A x64
+cmake -G "Ninja Multi-Config" ..
 cd ..
 # Add optional -- -j 8
-cmake --build build --config Release
 cmake --build build --target package --config Release

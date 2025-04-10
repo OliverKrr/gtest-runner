@@ -1,0 +1,84 @@
+name: Build
+
+on:
+  push:
+  release:
+jobs:
+  Build-and-Deploy:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-latest, windows-latest ]
+        build_type: [ Release ]
+        c_compiler: [ gcc, clang, cl ]
+        include:
+          - os: windows-latest
+            c_compiler: cl
+            cpp_compiler: cl
+          - os: ubuntu-latest
+            c_compiler: gcc
+            cpp_compiler: g++
+          - os: ubuntu-latest
+            c_compiler: clang
+            cpp_compiler: clang++
+        exclude:
+          - os: windows-latest
+            c_compiler: gcc
+          - os: windows-latest
+            c_compiler: clang
+          - os: ubuntu-latest
+            c_compiler: cl
+
+    steps:
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.9.0'
+
+      - uses: actions/checkout@v4
+
+      - uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Set reusable strings
+        id: strings
+        shell: bash
+        run: |
+          echo "build-output-dir=${{ github.workspace }}/build" >> "$GITHUB_OUTPUT"
+
+      - name: Configure CMake
+        run: >
+          cmake -B ${{ steps.strings.outputs.build-output-dir }}
+          -G "Ninja Multi-Config"
+          -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }}
+          -DCMAKE_C_COMPILER=${{ matrix.c_compiler }}
+          -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+          -S ${{ github.workspace }}
+
+      - name: Build and Package
+        run: cmake --build ${{ steps.strings.outputs.build-output-dir }} --target package --config ${{ matrix.build_type }}
+
+      - name: Sign Windows
+        if: startsWith(matrix.os, 'windows')
+        env:
+          PWD: ${{ secrets.CertPwd }}
+        run: signtool sign -f ${{ github.workspace }}/resources/certificates/certum.pfx -p "$env:PWD" -tr http://timestamp.digicert.com -td sha256 -fd sha256 ${{ steps.strings.outputs.build-output-dir }}/${{ matrix.build_type }}/gtest-runner-*.exe
+
+      - name: Upload Windows Artifacts
+        uses: actions/upload-artifact@v4
+        if: startsWith(matrix.os, 'windows')
+        with:
+          name: Executable
+          path: |
+            ${{ steps.strings.outputs.build-output-dir }}/${{ matrix.build_type }}/gtest-runner-*.exe
+            ${{ steps.strings.outputs.build-output-dir }}/${{ matrix.build_type }}/gtest-runner-*.zip
+          if-no-files-found: error
+
+      - name: Upload Ubuntu Artifacts
+        uses: actions/upload-artifact@v4
+        if: startsWith(matrix.os, 'ubuntu') && matrix.c_compiler == 'gcc'
+        with:
+          name: Debian Package
+          path: ${{ steps.strings.outputs.build-output-dir }}/${{ matrix.build_type }}/gtest-runner*.deb
+          if-no-files-found: error
