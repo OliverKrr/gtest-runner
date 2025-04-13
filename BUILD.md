@@ -63,7 +63,7 @@ _Make sure you've installed all the [prerequisites](#prerequisites) before proce
    * `sh release.sh`
    * `cd Release`
    * Run the installer using `gtest-runner-v[VERSION]-[TARGET].exe`, where version is the gtest-version that you downloaded, and target is win32 or win64 depending on your platform. If you're not sure what to use, type the `dir` command to see which executable was generated.
-       * example: `gtest-runner-v1.4.0-win64.exe`
+       * example: `gtest-runner-v2.0.0-win64.exe`
 
 The installer is used to create program shortcuts and links in your application menu. If you prefer not to use the installer (or can't use it), you can still run `gtest-runner.exe` directly from the Release directory.
 
@@ -75,7 +75,7 @@ The installer is used to create program shortcuts and links in your application 
    - `git clone https://github.com/OliverKrr/gtest-runner.git`
    - `cd ~/gtest-runner`
    - `git tag -l` to see the available versions
-   - `git checkout [version]`, where [version] was the newest version tag, example: `git checkout v1.4.0`
+   - `git checkout [version]`, where [version] was the newest version tag, example: `git checkout v2.0.0`
 
 3. Build and install the code
 
