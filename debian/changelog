@@ -1,0 +1,25 @@
+gtest-runner (2.0.0) noble; urgency=medium
+
+  * Added support for a history of test results
+  * Added support to view available tests
+  * Added option to re-run all failed tests or a selected set of tests/tests suites
+  * Added option to multi-select test executables for test execution
+  * Added option to hide succeeded/ignored tests
+  * Added a toolbar for fast options access
+  * Added support to supply a run environment for test execution
+  * Added support for multiple test environments
+  * Added support to use a TestDriver.py for test execution
+    * Added 'Update tests' to add all available tests found via the TestDriver.py at the run environment directory
+  * Added option to run tests synchronously instead of in parallel
+  * Added option to run/kill all tests
+  * Added option to 'Toggle auto-run' for all tests
+  * Added "value_param" of the GTest result to the UI
+    * This is useful in combination with dynamically creating tests via *INSTANTIATE_TEST_CASE_P*
+  * Added *gtest_fail_fast* option
+  * Added *gtest_break_on_failure* option
+  * Store settings in AppConfigLocation as JSON instead of registry
+  * Added support for native dark mode
+  * Updated Qt to 6.9 and C++20
+  * Build x64 by default
+
+ -- Oliver Karrenbauer <oliver.karrenbauer@gmail.com>  Mon, 14 Apr 2025 13:00:00 +0200

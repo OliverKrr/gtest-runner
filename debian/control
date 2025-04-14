@@ -1,0 +1,11 @@
+Source: gtest-runner
+Section: devel
+Priority: optional
+Maintainer: Oliver Karrenbauer <oliver.karrenbauer@gmail.com>
+Build-Depends: debhelper, cmake, qt6-base-dev, git
+Homepage: https://github.com/OliverKrr/gtest-runner
+
+Package: gtest-runner
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: A cross-platform, Qt6 based Graphical User Interface for Google Test unit tests

@@ -1,0 +1,36 @@
+name: Upload to Launchpad
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  Build-and-Upload:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Import GPG
+        uses: crazy-max/ghaction-import-gpg@v6
+        with:
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.GPG_PASSPHRASE }}
+
+      - name: Install Packages
+        run: sudo apt-get install devscripts debhelper dput
+
+      - name: Get upstream source tarball
+        env:
+          TAG_NAME: ${{ github.ref }}
+        run: |
+          curl --silent -L "https://github.com/OliverKrr/gtest-runner/archive/refs/tags/${TAG_NAME}.tar.gz" -o gtest-runner-${TAG_NAME}.orig.tar.gz
+          tar xfz gtest-runner-${TAG_NAME}.orig.tar.gz
+          cd gtest-runner-*/
+
+      - name: Build source package
+        run: debuild -S -sa
+
+      - name: Upload source packages
+        run: dput ppa:oliverkrr/gtest-runner */*.changes
